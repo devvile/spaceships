@@ -60,11 +60,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         #region My Parameters
 
-        private int _entryFastStochValueLong = 29;
+        private int _entryFastStochValueLong = 19;
         private int _baseStopMarginLong = 8;
         private double _targetRatioLong = 2.0;
 
-        private int _entryFastStochValueShort = 71;
+        private int _entryFastStochValueShort = 81;
         private int _baseStopMarginShort = 8;
         private double _targetRatioShort = 2.0;
 
