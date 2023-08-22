@@ -53,6 +53,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         #endregion
 
         #region My Parameters
+
+        private Indicator _aroon;
         private double _stopLoss = 28;
         private double _stopLossShort = 28;
         private double _profitTarget = 60;
@@ -63,6 +65,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         private double _profitTargetShort2 = 60;
         private double _profitTargetShort3 = 80;
         private double _extraTargetShort = 60;
+        private bool _useAroon = true;
+        private int _aroonPeriod = 24;
+
+
 
         private int _entryRsiPeriod = 9;
         private int _entryRsiValueLong = 29;
@@ -131,12 +137,6 @@ namespace NinjaTrader.NinjaScript.Strategies
             set { _entryRsiValueLong = value; }
         }
 
-        [Display(Name = "Initial Stop Loss Long", GroupName = "LONGS", Order = 0)]
-        public double StopLoss
-        {
-            get { return _stopLoss; }
-            set { _stopLoss = value; }
-        }
 
         [Display(Name = "Profit Target Long 1", GroupName = "LONGS", Order = 0)]
         public double ProfitTarget
@@ -251,12 +251,6 @@ namespace NinjaTrader.NinjaScript.Strategies
             set { _extraTargetShort = value; }
         }
 
-        [Display(Name = "Initial Stop Loss Short", GroupName = "SHORTS", Order = 0)]
-        public double StopLossShort
-        {
-            get { return _stopLossShort; }
-            set { _stopLossShort = value; }
-        }
 
         [Display(Name = "Base Stop Margin Short", GroupName = "SHORTS", Order = 0)]
         public int BaseStopMarginShort
@@ -300,6 +294,24 @@ namespace NinjaTrader.NinjaScript.Strategies
             set { _extraSize = value; }
         }
 
+
+        #endregion
+
+        #region Filters
+
+        [Display(Name = "Aroon Period", GroupName = "Filters", Order = 0)]
+        public int AroonPeriod
+        {
+            get { return _aroonPeriod; }
+            set { _aroonPeriod = value; }
+        }
+
+        [Display(Name = "Use Aroon", GroupName = "Filters", Order = 0)]
+        public bool UseAroon
+        {
+            get { return _useAroon; }
+            set { _useAroon = value; }
+        }
 
         #endregion
 
@@ -373,12 +385,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                 status = "Flat";
 
             }
-            if (BarsInProgress == 0)
-            {
-                calculateStopLong();
-                calculateStopShort();
-            }
-
 
             if (BarsInProgress == 1)
             {
@@ -425,16 +431,17 @@ namespace NinjaTrader.NinjaScript.Strategies
                     Print("EXTRA LONGGGGGG~!!!!!!");
                     _longFourOrder = EnterLong(ExtraSize, "Long Entry4");
                     _canExtra = false;
+                    status = "Extra Long";
                 }
 
 
-                /*
-                if (firstTrailConditionLong()) //move to breakEven
+                if (firstTrailConditionLong()) 
                 {
                     Print("Moving stop to Breakeven");
-                    SetStopLoss(CalculationMode.Price, _longEntryPrice1 + (6 * TickSize));
+                    SetStopLoss(CalculationMode.Price, _longEntryPrice1 + (1 * TickSize));
                     status = "Long Stop Breakeven";
                 }
+                /*
 
                 if (secondTrailConditionLong()) 
                 {
@@ -460,11 +467,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                     Print("EXTRA SHORTTTTT ~!!!!!!");
                     _shortFourOrder = EnterShort(ExtraSize, "Short Entry4");
                     _canExtra = false;
+                    status = "Extra Short";
                 }
 
-                /*
-                if (firstTrailConditionShort()) //move to breakEven
-                {
+                if (firstTrailConditionShort())
+                { 
                     Print("Moving stop to Breakeven");
                     Print("Print TUTAJ KRUWA TUTAJ");
                     Print(_shortEntryPrice1);
@@ -472,9 +479,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                     Print(_shortEntryPrice1 - (3 * TickSize));
                     status = "Short Stop Breakeven";
                     //                    SetStopLoss(CalculationMode.Price, _longEntryPrice1 + (6 * TickSize));
-                      SetStopLoss(CalculationMode.Price, _shortEntryPrice1 - (3 * TickSize));
+                      SetStopLoss(CalculationMode.Price, _shortEntryPrice1 - (1 * TickSize));
             
                 }
+
+
+                /*
        
                 if (secondTrailConditionShort()) //move to breakEven
                 {
@@ -491,7 +501,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private bool firstTrailConditionLong()
         {
-            if (status == "Long 2 Default" || status == "Long 1 Default")
+            if (status == "Long 2 Default" || status == "Long 1 Default" && status != "Extra Long")
             {
                 return Position.MarketPosition == MarketPosition.Long && Close[BarNr] >= _longEntryPrice1 + (StopSwitchLong1 * TickSize) && status != "Long Stop Breakeven";
             }
@@ -528,7 +538,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private bool firstTrailConditionShort()
         {
-            if (status == "Short 2 Default" || status == "Short 1 Default")
+            if (status == "Short 2 Default" || status == "Short 1 Default" && status != "Extra Short")
             {
                 return Position.MarketPosition == MarketPosition.Short && Close[0] <= _shortEntryPrice1 - (StopSwitchShort1 * TickSize) && status != "Short Stop Breakeven";
             }
@@ -552,14 +562,14 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private bool ShortCondition1()
         {
-            return (Position.MarketPosition == MarketPosition.Flat && _rsiEntry[1] >= EntryRsiValueShort && previousCandleRed()); //&& Closes[0][0] < _sma[0]; //|| (isDowntrend() && Position.MarketPosition == MarketPosition.Flat && _checkPointShort == true && _canTrade && _rsiEntry[0] <= EntryRsiValueShort - _thresholdShort - 1);
+            return (Position.MarketPosition == MarketPosition.Flat && _rsiEntry[1] >= EntryRsiValueShort && previousCandleRed()) && IsAroonDowntrend(); //&& Closes[0][0] < _sma[0]; //|| (isDowntrend() && Position.MarketPosition == MarketPosition.Flat && _checkPointShort == true && _canTrade && _rsiEntry[0] <= EntryRsiValueShort - _thresholdShort - 1);
         }
 
 
         private bool LongCondition1()
         {
 
-            return (Position.MarketPosition == MarketPosition.Flat && _rsiEntry[1] <= EntryRsiValueLong && previousCandleGreen()); //&& Closes[0][0] > _sma[0]; // || (isUptrend() && Position.MarketPosition == MarketPosition.Flat && _checkPointLong == true &&  _canTrade && _rsiEntry[0] >= EntryRsiValueLong + _thresholdLong + 1 );
+            return (Position.MarketPosition == MarketPosition.Flat && _rsiEntry[1] <= EntryRsiValueLong && previousCandleGreen()) && IsAroonUptrend(); //&& Closes[0][0] > _sma[0]; // || (isUptrend() && Position.MarketPosition == MarketPosition.Flat && _checkPointLong == true &&  _canTrade && _rsiEntry[0] >= EntryRsiValueLong + _thresholdLong + 1 );
         }
 
 
@@ -587,7 +597,7 @@ OrderState orderState, DateTime time, ErrorCode error, string comment)
 
             else if (OrderFilled(order) && IsLongOrder4(order))
             {
-                SetTrailStop("Long Entry4", CalculationMode.Price, calculateStopLong(), false);
+                SetStopLoss(CalculationMode.Price, calculateStopLong());
                 SetProfitTarget("Long Entry4", CalculationMode.Ticks, ExtraTargetLong);
             }
 
@@ -611,7 +621,7 @@ OrderState orderState, DateTime time, ErrorCode error, string comment)
             }
             else if (OrderFilled(order) && IsShortOrder4(order))
             {
-                SetTrailStop("Short Entry4", CalculationMode.Price, calculateStopShort(), false);
+                SetStopLoss(CalculationMode.Price, calculateStopShort());
                 SetProfitTarget("Short Entry4", CalculationMode.Ticks, ExtraTargetShort);
             }
         }
@@ -697,14 +707,40 @@ OrderState orderState, DateTime time, ErrorCode error, string comment)
 
         private bool previousCandleRed()
         {
-            return Closes[1][0] < Opens[1][0] && Closes[1][1] > Opens[1][1];
+            return Closes[1][0] <= Opens[1][0] && Closes[1][1] >= Opens[1][1];
         }
 
         private bool previousCandleGreen()
         {
-            return Closes[1][0] > Opens[1][0] && Closes[1][1] < Opens[1][1];
+            return Closes[1][0] >= Opens[1][0] && Closes[1][1] <= Opens[1][1];
         }
 
+
+        private bool IsAroonUptrend()
+        {
+            if (UseAroon)
+            {
+                return Aroon(BarsArray[1], AroonPeriod).Up[0] > Aroon(BarsArray[1], AroonPeriod).Down[0];
+            }
+            else
+            {
+                return true;
+            }
+
+        }
+
+        private bool IsAroonDowntrend()
+        {
+            if (UseAroon)
+            {
+                return Aroon(BarsArray[1], AroonPeriod).Up[0] < Aroon(BarsArray[1], AroonPeriod).Down[0];
+            }
+            else
+            {
+                return true;
+            }
+
+        }
 
 
         private void AddIndicators()
@@ -716,6 +752,8 @@ OrderState orderState, DateTime time, ErrorCode error, string comment)
             AddChartIndicator(_emaMin);
             AddChartIndicator(_emaMax);
             AddChartIndicator(_pSar);
+            _aroon = Aroon(BarsArray[1], AroonPeriod);
+            AddChartIndicator(_aroon);
             _rsiEntry = RSI(BarsArray[1],EntryRsiPeriod, 1);
             AddChartIndicator(_rsiEntry);
         }
