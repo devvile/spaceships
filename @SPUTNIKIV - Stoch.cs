@@ -29,57 +29,60 @@ namespace NinjaTrader.NinjaScript.Strategies
         private Indicator _emaMin;
         private Indicator _emaMax;
         private Indicator _pSar;
+
+        private double _stochFast;
+
         private Order _longOneOrder;
         private Order _longTwoOrder;
         private Order _longThreeOrder;
         private Order _longFourOrder;
-        private double _stochFast;
-
+        private Order _longFiveOrder;
+        private Order _longSixOrder;
+        private double _shortStopSwitch1Ticks;
+        private double _stopLossBaseShort;
+        private double _shortEntryPrice1;
 
         private Order _shortOneOrder;
         private Order _shortTwoOrder;
         private Order _shortThreeOrder;
         private Order _shortFourOrder;
+        private Order _shortFiveOrder;
+        private Order _shortSixOrder;
+
         private Order _longTargetOrder1;
         private double _longEntryPrice1;
-        private double _shortEntryPrice1;
         private double _longStopSwitch1Ticks;
-        private double _longStopSwitch2Ticks;
-        private double _shortStopSwitch1Ticks;
-        private double _shortStopSwitch2Ticks;
-        private double _longStopLoss2;
         private double _stopLossBaseLong;
-        private double _stopLossBaseShort;
+
         #endregion
 
         #region My Parameters
 
-        private Indicator _aroon;
-        private double _stopLoss = 28;
-        private double _stopLossShort = 28;
         private double _profitTarget = 16;
         private double _profitTargetLong2 = 20;
         private double _profitTargetLong3 = 30;
-        private double _extraTargetLong = 60;
-        private double _profitTargetShort = 40;
-        private double _profitTargetShort2 = 60;
-        private double _profitTargetShort3 = 80;
-        private double _extraTargetShort = 60;
-        private bool _useAroon = true;
-        private int _aroonPeriod = 24;
+        private double _extraTargetLong1 = 10;
+        private double _extraTargetLong2 = 20;
+        private double _extraTargetLong3 = 30;
+        private int _entryFastStochValueLong = 10;
+        private int _baseStopMarginLong = 18;
 
+
+        private double _profitTargetShort = 16;
+        private double _profitTargetShort2 = 20;
+        private double _profitTargetShort3 = 30;
+        private double _extraTargetShort1 = 10;
+        private double _extraTargetShort2 = 20;
+        private double _extraTargetShort3 = 30;
+        private int _entryFastStochValueShort = 90;
+        private int _baseStopMarginShort = 18;
 
         private int _stochRsiPeriod = 9;
         private int _fastMAPeriod = 3;
         private int _slowMAPeriod = 3;
         private int _lookBack = 14;
 
-        private int _entryFastStochValueLong = 19;
-        private int _baseStopMarginLong = 18;
 
-
-        private int _entryFastStochValueShort = 81;
-        private int _baseStopMarginShort = 18;
 
         private int _emaMinPeriod = 5;
         private int _emaMaxPeriod = 15;
@@ -158,11 +161,25 @@ namespace NinjaTrader.NinjaScript.Strategies
             set { _profitTargetLong3 = value; }
         }
 
-        [Display(Name = "Extra Target Long", GroupName = "LONGS", Order = 0)]
-        public double ExtraTargetLong
+        [Display(Name = "Extra Target Long 1", GroupName = "LONGS", Order = 0)]
+        public double ExtraTargetLong1
         {
-            get { return _extraTargetLong; }
-            set { _extraTargetLong = value; }
+            get { return _extraTargetLong1; }
+            set { _extraTargetLong1 = value; }
+        }
+
+        [Display(Name = "Extra Target Long 2", GroupName = "LONGS", Order = 0)]
+        public double ExtraTargetLong2
+        {
+            get { return _extraTargetLong2; }
+            set { _extraTargetLong2 = value; }
+        }
+
+        [Display(Name = "Extra Target Long 3", GroupName = "LONGS", Order = 0)]
+        public double ExtraTargetLong3
+        {
+            get { return _extraTargetLong3; }
+            set { _extraTargetLong3 = value; }
         }
 
         [Display(Name = "Stop Switch Long Level 1", GroupName = "LONGS", Order = 0)]
@@ -228,12 +245,28 @@ namespace NinjaTrader.NinjaScript.Strategies
             set { _profitTargetShort3 = value; }
         }
 
-        [Display(Name = "Extra Target Short", GroupName = "SHORTS", Order = 0)]
-        public double ExtraTargetShort
+        [Display(Name = "Extra Target Short 1", GroupName = "SHORTS", Order = 0)]
+        public double ExtraTargetShort1
         {
-            get { return _extraTargetShort; }
-            set { _extraTargetShort = value; }
+            get { return _extraTargetShort1; }
+            set { _extraTargetShort1 = value; }
         }
+
+        [Display(Name = "Extra Target Short 2", GroupName = "SHORTS", Order = 0)]
+        public double ExtraTargetShort2
+        {
+            get { return _extraTargetShort2; }
+            set { _extraTargetShort2 = value; }
+        }
+
+
+        [Display(Name = "Extra Target Short 3", GroupName = "SHORTS", Order = 0)]
+        public double ExtraTargetShort3
+        {
+            get { return _extraTargetShort3; }
+            set { _extraTargetShort3 = value; }
+        }
+
 
 
         [Display(Name = "Base Stop Margin Short", GroupName = "SHORTS", Order = 0)]
@@ -283,19 +316,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         #region Filters
 
-        [Display(Name = "Aroon Period", GroupName = "Filters", Order = 0)]
-        public int AroonPeriod
-        {
-            get { return _aroonPeriod; }
-            set { _aroonPeriod = value; }
-        }
-
-        [Display(Name = "Use Aroon", GroupName = "Filters", Order = 0)]
-        public bool UseAroon
-        {
-            get { return _useAroon; }
-            set { _useAroon = value; }
-        }
 
         #endregion
 
@@ -369,6 +389,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Description = @"Sputnik IV using stochastic";
                 Name = "Sputnik IV Stoch";
                 Calculate = Calculate.OnBarClose;
+                BarsRequiredToTrade = 20;
 
             }
 
@@ -380,7 +401,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Calculate = Calculate.OnBarClose;
 
                 RealtimeErrorHandling = RealtimeErrorHandling.IgnoreAllErrors;
-                AddHeikenAshi("MNQ 09-23", BarsPeriodType.Minute, 1, MarketDataType.Last);
+                AddHeikenAshi("MES 09-23", BarsPeriodType.Minute, 1, MarketDataType.Last);
             }
             else if (State == State.DataLoaded)
             {
@@ -440,6 +461,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     Print("EXTRA LONGGGGGG~!!!!!!");
                     _longFourOrder = EnterLong(ExtraSize, "Long Entry4");
+                    _longFiveOrder = EnterLong(ExtraSize, "Long Entry5");
+                    _longSixOrder = EnterLong(ExtraSize, "Long Entry6");
                     _canExtra = false;
                     status = "Extra Long";
                 }
@@ -467,6 +490,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     Print("EXTRA SHORTTTTT ~!!!!!!");
                     _shortFourOrder = EnterShort(ExtraSize, "Short Entry4");
+                    _shortFiveOrder = EnterShort(ExtraSize, "Short Entry5");
+                    _shortSixOrder = EnterShort(ExtraSize, "Short Entry6");
                     _canExtra = false;
                     status = "Extra Short";
                 }
@@ -503,12 +528,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private bool LongExtraCondition1()
         {
-                return Position.MarketPosition == MarketPosition.Long && _canExtra && (CrossAbove(_emaMin, _emaMax,  1) && _pSar[0] < Closes[1][0]);//&& EMA 15  i 5 oraz SAR ;
+            return Position.MarketPosition == MarketPosition.Long && (CrossAbove(_emaMin, _emaMax, 1) && _pSar[0] < Closes[1][0]) && _canExtra; // && EMA 15  i 5 oraz SAR ;
         }
 
         private bool ShortExtraCondition1()
         {
-                return Position.MarketPosition == MarketPosition.Short && _canExtra && (CrossBelow(_emaMin, _emaMax,  1) && _pSar[0] > Closes[1][0]); //&& EMA 15  i 5 oraz SAR ;
+            return Position.MarketPosition == MarketPosition.Short && (CrossBelow(_emaMin, _emaMax, 1) && _pSar[0] > Closes[1][0]) && _canExtra; //&& EMA 15  i 5 oraz SAR ;
 
         }
 
@@ -528,14 +553,14 @@ namespace NinjaTrader.NinjaScript.Strategies
         private bool ShortCondition1()
         {
             _stochFast = StochRSIMod2NT8(StochRsiPeriod, FastMAPeriod, SlowMAPeriod, LookBack).SK[1];
-            return (Position.MarketPosition == MarketPosition.Flat &&  _stochFast >= EntryFastStochValueShort && previousCandleRed()) && IsAroonDowntrend(); //&& Closes[0][0] < _sma[0]; //|| (isDowntrend() && Position.MarketPosition == MarketPosition.Flat && _checkPointShort == true && _canTrade && _rsiEntry[0] <= EntryRsiValueShort - _thresholdShort - 1);
+            return (Position.MarketPosition == MarketPosition.Flat &&  _stochFast >= EntryFastStochValueShort && previousCandleRed()); //&& Closes[0][0] < _sma[0]; //|| (isDowntrend() && Position.MarketPosition == MarketPosition.Flat && _checkPointShort == true && _canTrade && _rsiEntry[0] <= EntryRsiValueShort - _thresholdShort - 1);
         }
 
 
         private bool LongCondition1()
         {
          _stochFast = StochRSIMod2NT8(StochRsiPeriod, FastMAPeriod, SlowMAPeriod, LookBack).SK[1];
-          return (Position.MarketPosition == MarketPosition.Flat && _stochFast <= EntryFastStochValueLong && previousCandleGreen()) && IsAroonUptrend(); //&& Closes[0][0] > _sma[0]; // || (isUptrend() && Position.MarketPosition == MarketPosition.Flat && _checkPointLong == true &&  _canTrade && _rsiEntry[0] >= EntryRsiValueLong + _thresholdLong + 1 );
+          return (Position.MarketPosition == MarketPosition.Flat && _stochFast <= EntryFastStochValueLong && previousCandleGreen()); //&& Closes[0][0] > _sma[0]; // || (isUptrend() && Position.MarketPosition == MarketPosition.Flat && _checkPointLong == true &&  _canTrade && _rsiEntry[0] >= EntryRsiValueLong + _thresholdLong + 1 );
         }
 
 
@@ -564,7 +589,19 @@ OrderState orderState, DateTime time, ErrorCode error, string comment)
             else if (OrderFilled(order) && IsLongOrder4(order))
             {
                 SetStopLoss(CalculationMode.Price, calculateStopLong());
-                SetProfitTarget("Long Entry4", CalculationMode.Ticks, ExtraTargetLong);
+                SetProfitTarget("Long Entry4", CalculationMode.Ticks, ExtraTargetLong1);
+            }
+
+            else if (OrderFilled(order) && IsLongOrder5(order))
+            {
+                SetStopLoss(CalculationMode.Price, calculateStopLong());
+                SetProfitTarget("Long Entry4", CalculationMode.Ticks, ExtraTargetLong2);
+            }
+
+            else if (OrderFilled(order) && IsLongOrder6(order))
+            {
+                SetStopLoss(CalculationMode.Price, calculateStopLong());
+                SetProfitTarget("Long Entry4", CalculationMode.Ticks, ExtraTargetLong3);
             }
 
             else if (OrderFilled(order) && IsShortOrder1(order))
@@ -588,7 +625,17 @@ OrderState orderState, DateTime time, ErrorCode error, string comment)
             else if (OrderFilled(order) && IsShortOrder4(order))
             {
                 SetStopLoss(CalculationMode.Price, calculateStopShort());
-                SetProfitTarget("Short Entry4", CalculationMode.Ticks, ExtraTargetShort);
+                SetProfitTarget("Short Entry4", CalculationMode.Ticks, ExtraTargetShort1);
+            }
+            else if (OrderFilled(order) && IsShortOrder5(order))
+            {
+                SetStopLoss(CalculationMode.Price, calculateStopShort());
+                SetProfitTarget("Short Entry4", CalculationMode.Ticks, ExtraTargetShort2);
+            }
+            else if (OrderFilled(order) && IsShortOrder6(order))
+            {
+                SetStopLoss(CalculationMode.Price, calculateStopShort());
+                SetProfitTarget("Short Entry4", CalculationMode.Ticks, ExtraTargetShort3);
             }
         }
 
@@ -624,6 +671,7 @@ OrderState orderState, DateTime time, ErrorCode error, string comment)
 
             return highestHigh;
         }
+        #region Orders Conditions
 
         private bool IsLongOrder1(Order order)
         {
@@ -643,6 +691,16 @@ OrderState orderState, DateTime time, ErrorCode error, string comment)
         private bool IsLongOrder4(Order order)
         {
             return order == _longFourOrder;
+        }
+
+        private bool IsLongOrder5(Order order)
+        {
+            return order == _longFiveOrder;
+        }
+
+        private bool IsLongOrder6(Order order)
+        {
+            return order == _longSixOrder;
         }
 
         private bool IsShortOrder1(Order order)
@@ -665,11 +723,22 @@ OrderState orderState, DateTime time, ErrorCode error, string comment)
             return order == _shortFourOrder;
         }
 
+        private bool IsShortOrder5(Order order)
+        {
+            return order == _shortFiveOrder;
+        }
+
+        private bool IsShortOrder6(Order order)
+        {
+            return order == _shortSixOrder;
+        }
 
         private bool OrderFilled(Order order)
         {
             return order.OrderState == OrderState.Filled;
         }
+
+        #endregion
 
         private bool previousCandleRed()
         {
@@ -682,32 +751,6 @@ OrderState orderState, DateTime time, ErrorCode error, string comment)
         }
 
 
-        private bool IsAroonUptrend()
-        {
-            if (UseAroon)
-            {
-                return Aroon(BarsArray[1], AroonPeriod).Up[0] > Aroon(BarsArray[1], AroonPeriod).Down[0];
-            }
-            else
-            {
-                return true;
-            }
-
-        }
-
-        private bool IsAroonDowntrend()
-        {
-            if (UseAroon)
-            {
-                return Aroon(BarsArray[1], AroonPeriod).Up[0] < Aroon(BarsArray[1], AroonPeriod).Down[0];
-            }
-            else
-            {
-                return true;
-            }
-
-        }
-
 
         private void AddIndicators()
         {
@@ -718,8 +761,6 @@ OrderState orderState, DateTime time, ErrorCode error, string comment)
             AddChartIndicator(_emaMin);
             AddChartIndicator(_emaMax);
             AddChartIndicator(_pSar);
-            _aroon = Aroon(BarsArray[1], AroonPeriod);
-            AddChartIndicator(_aroon);
         }
     }
 }
