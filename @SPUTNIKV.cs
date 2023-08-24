@@ -125,6 +125,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         Random rnd = new Random();
 
         private string status = "Flat";
+        private bool _canTrade = true;
 
 
         #endregion
@@ -487,8 +488,18 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             }
 
+            if (CanTradeInBerlinTime())
+            {
+                _canTrade = true;
+            }
+            else
+            {
+                _canTrade = false;
+            }
+
             if (Bars.IsFirstBarOfSession)
             {
+                _canTrade = true;
                 lastTrades = 0;
                 priorSessionTrades = SystemPerformance.AllTrades.Count;
             }
@@ -623,12 +634,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private bool LongExtraCondition1()
         {
-            return Position.MarketPosition == MarketPosition.Long && (CrossAbove(_emaMin, _emaMax, 1) && _pSar[0] < Closes[1][0]) && _canExtra; // && EMA 15  i 5 oraz SAR ;
+            return Position.MarketPosition == MarketPosition.Long && (CrossAbove(_emaMin, _emaMax, 1) && _pSar[0] < Closes[1][0]) && _canExtra && _canTrade; ; // && EMA 15  i 5 oraz SAR ;
         }
 
         private bool ShortExtraCondition1()
         {
-            return Position.MarketPosition == MarketPosition.Short && (CrossBelow(_emaMin, _emaMax, 1) && _pSar[0] > Closes[1][0]) && _canExtra; //&& EMA 15  i 5 oraz SAR ;
+            return Position.MarketPosition == MarketPosition.Short && (CrossBelow(_emaMin, _emaMax, 1) && _pSar[0] > Closes[1][0]) && _canExtra && _canTrade; ; //&& EMA 15  i 5 oraz SAR ;
 
         }
 
@@ -648,14 +659,14 @@ namespace NinjaTrader.NinjaScript.Strategies
         private bool ShortCondition1()
         {
             _stochFast = StochRSIMod2NT8(StochRsiPeriod, FastMAPeriod, SlowMAPeriod, LookBack).SK[1];
-            return (Position.MarketPosition == MarketPosition.Flat && _stochFast >= EntryFastStochValueShort && previousCandleRed()) && isDowntrend(); // && Position.MarketPosition == MarketPosition.Flat && _checkPointShort == true && _canTrade && _rsiEntry[0] <= EntryRsiValueShort - _thresholdShort - 1);
+            return (Position.MarketPosition == MarketPosition.Flat && _stochFast >= EntryFastStochValueShort && previousCandleRed()) && isDowntrend() && _canTrade; // && Position.MarketPosition == MarketPosition.Flat && _checkPointShort == true && _canTrade && _rsiEntry[0] <= EntryRsiValueShort - _thresholdShort - 1);
         }
 
 
         private bool LongCondition1()
         {
             _stochFast = StochRSIMod2NT8(StochRsiPeriod, FastMAPeriod, SlowMAPeriod, LookBack).SK[1];
-            return (Position.MarketPosition == MarketPosition.Flat && _stochFast <= EntryFastStochValueLong && previousCandleGreen()) && isUptrend(); // || (isUptrend() && Position.MarketPosition == MarketPosition.Flat && _checkPointLong == true &&  _canTrade && _rsiEntry[0] >= EntryRsiValueLong + _thresholdLong + 1 );
+            return (Position.MarketPosition == MarketPosition.Flat && _stochFast <= EntryFastStochValueLong && previousCandleGreen()) && _canTrade;// && isUptrend(); // || (isUptrend() && Position.MarketPosition == MarketPosition.Flat && _checkPointLong == true &&  _canTrade && _rsiEntry[0] >= EntryRsiValueLong + _thresholdLong + 1 );
         }
 
         #region onOrderUpdate
@@ -933,15 +944,23 @@ OrderState orderState, DateTime time, ErrorCode error, string comment)
             {
                 if(Closes[3][0] <= Opens[3][0] && Closes[3][1] >= Opens[3][1]) //closing candle red after previous green on D1;
                 {
-                    UseLongs = false;
+               //     UseLongs = false;
                     UseShorts = true;
                 }
                 else if ( Closes[3][0] >= Opens[3][0] && Closes[3][1] <= Opens[3][1] ) ////closing candle green after previous red on D1;
                 {
-                    UseLongs = true;
+                 //   UseLongs = true;
                     UseShorts = false;
                 }
             }
+        }
+
+        private bool CanTradeInBerlinTime()
+        {
+            TimeZoneInfo berlinZone = TimeZoneInfo.FindSystemTimeZoneById("Central European Standard Time");
+            DateTime berlinTime = TimeZoneInfo.ConvertTime(Time[0], berlinZone);
+
+            return berlinTime.Hour < 21 || (berlinTime.Hour == 21 && berlinTime.Minute <= 52);
         }
 
         private void AddIndicators()
