@@ -22,12 +22,14 @@ using System.Security.Cryptography;
 
 namespace NinjaTrader.NinjaScript.Strategies
 {
-    public class SputnikIVStoch : Strategy
+    public class SputnikV : Strategy
     {
         #region declarations
         private Indicator _sma;
         private Indicator _emaMin;
         private Indicator _emaMax;
+        private Indicator _emaMinDay;
+        private Indicator _emaMaxDay;
         private Indicator _pSar;
 
         private double _stochFast;
@@ -71,7 +73,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private int _entryFastStochValueLong = 10;
         private int _baseStopMarginLong = 18;
 
-
+        private int _heikenPeriod = 240;
         private double _profitTargetShort = 16;
         private double _profitTargetShort2 = 20;
         private double _profitTargetShort3 = 30;
@@ -88,10 +90,16 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 
 
-        private int _emaMinPeriod = 5;
+        private int _emaMinPeriod = 5; 
         private int _emaMaxPeriod = 15;
 
- 
+
+        private int _emaMinPeriodDay = 5;
+        private int _emaMaxPeriodDay = 15;
+
+        private int _emaMinutePeriodMin = 60;
+
+
         private int lastTrades = 0;    // This variable holds our value for how profitable the last trades were. Splitted position are individually counted.
         private int priorNumberOfTrades = 0;    // This variable holds the number of trades taken. It will be checked every OnBarUpdate() to determine when a trade has closed.
         private int priorSessionTrades = 0;
@@ -101,6 +109,12 @@ namespace NinjaTrader.NinjaScript.Strategies
         private bool _useLongs = true;
         private bool _useShorts = true;
         private bool _reset = true;
+        private bool _log = false;
+        private bool _start = false;
+        private bool _useHeikenAshi = true;
+
+        private bool _doingGood = true;
+
         private int _lotSize1 = 2;
         private int _lotSize2 = 4;
         private int _lotSize3 = 1;
@@ -335,6 +349,19 @@ namespace NinjaTrader.NinjaScript.Strategies
         #region Filters
 
 
+        [Display(Name = "Use Heiken Ashi Day filter", GroupName = "Filters", Order = 0)]
+        public bool UseHeikenDayFilter
+        {
+            get { return _useHeikenAshi; }
+            set { _useHeikenAshi = value; }
+        }
+        [Display(Name = "Use Heiken Ashi filter minutes period", GroupName = "Filters", Order = 0)]
+        public int HeikenPeriod
+        {
+            get { return _heikenPeriod; }
+            set { _heikenPeriod = value; }
+        }
+
         #endregion
 
         #region EMA
@@ -347,7 +374,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
 
 
-        [Display(Name = "EMA Min PERIOD", GroupName = "EMA", Order = 0)]
+        [Display(Name = "EXTRA EMA Min PERIOD", GroupName = "EMA", Order = 3)]
         public int EmaMinPeriod
         {
             get { return _emaMinPeriod; }
@@ -355,11 +382,26 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
 
 
-        [Display(Name = "EMA Max PERIOD", GroupName = "EMA", Order = 0)]
+        [Display(Name = "EXTRA EMA Max PERIOD", GroupName = "EMA", Order = 4)]
         public int EmaMaxPeriod
         {
             get { return _emaMaxPeriod; }
             set { _emaMaxPeriod = value; }
+        }
+
+        [Display(Name = "DAY EMA Min PERIOD", GroupName = "EMA", Order = 1)]
+        public int EmaMinPeriodDay
+        {
+            get { return _emaMinPeriodDay; }
+            set { _emaMinPeriodDay = value; }
+        }
+
+
+        [Display(Name = "DAY EMA Max PERIOD", GroupName = "EMA", Order = 2)]
+        public int EmaMaxPeriodDay
+        {
+            get { return _emaMaxPeriodDay; }
+            set { _emaMaxPeriodDay = value; }
         }
 
 
@@ -404,10 +446,12 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             if (State == State.SetDefaults)
             {
-                Description = @"Sputnik IV using stochastic";
-                Name = "Sputnik IV Stoch";
+                Description = @"Sputnik V fith filter";
+                Name = "Sputnik V";
                 Calculate = Calculate.OnBarClose;
                 BarsRequiredToTrade = 20;
+                AddPlot(Brushes.Blue, "Upper");
+                AddPlot(Brushes.Green, "Lower");
 
             }
 
@@ -416,36 +460,42 @@ namespace NinjaTrader.NinjaScript.Strategies
                 ClearOutputWindow();
                 EntryHandling = EntryHandling.AllEntries;
                 EntriesPerDirection = 6;
-                Calculate = Calculate.OnBarClose;
-
                 RealtimeErrorHandling = RealtimeErrorHandling.IgnoreAllErrors;
                 AddHeikenAshi("MES 09-23", BarsPeriodType.Minute, 1, MarketDataType.Last);
+                AddDataSeries(BarsPeriodType.Day, 1);
+                AddHeikenAshi("MES 09-23", BarsPeriodType.Day, 1, MarketDataType.Last);
+                AddHeikenAshi("MES 09-23", BarsPeriodType.Minute, HeikenPeriod, MarketDataType.Last);
             }
+
             else if (State == State.DataLoaded)
             {
                 ClearOutputWindow();
                 AddIndicators();
-                Calculate = Calculate.OnBarClose;
             }
         }
 
         protected override void OnBarUpdate()
         {
-            if (CurrentBar < BarsRequiredToTrade) return;
+
+            if (CurrentBars[0] <= BarsRequiredToTrade || CurrentBars[1] <= BarsRequiredToTrade || CurrentBars[2] <= BarsRequiredToTrade)  return;
+
+
 
             if (Position.MarketPosition == MarketPosition.Flat)
             {
                 status = "Flat";
 
             }
+
             if (Bars.IsFirstBarOfSession)
             {
                 lastTrades = 0;
                 priorSessionTrades = SystemPerformance.AllTrades.Count;
             }
 
-            if (BarsInProgress == 1)
+            if (BarsInProgress == 1 && _log)
             {
+                
                 Print("HAIKEN ASHI!");
                 Print(Time[0]);
                 Print("CLOSE" + Close[0]);
@@ -455,17 +505,24 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Print("~~~~~~~~~~~~~~");
             }
 
-            checkForLosingTrades();
+            if(BarsInProgress == 2)
+            {
+                filterHeikenAshi();
+            };
 
+            checkForLosingTrades();
+            /*
             if (Position.MarketPosition == MarketPosition.Flat)
                 {
                     _canExtra = true;
+                    _doingGood= true;
                 }
-
+        */
             ResetStrategy();
             if (lastTrades != -1 * ConsecutvieLosses * 3)
             {
                 _canExtra = true;
+                _doingGood = true;
                 LotSize1 = UserLotSize1;
                 LotSize2 = UserLotSize2;
                 LotSize3 = UserLotSize3;
@@ -476,6 +533,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             else
             {
                 _canExtra = false;
+                _doingGood = false;
                 LotSize1 = 1;
                 LotSize2 = 1;
                 LotSize3 = 1;
@@ -489,54 +547,56 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (LongCondition1())
                 {
                     _longOneOrder = EnterLong(LotSize1,  "Basic Long Entry1");
-                    _longTwoOrder = EnterLong(LotSize2,  "Basic Long Entry2");
-                    _longThreeOrder = EnterLong(LotSize3, "Basic Long Entry3");
+
+
+                    if (_doingGood)
+                    {
+                        _longTwoOrder = EnterLong(LotSize2, "Basic Long Entry2");
+                        _longThreeOrder = EnterLong(LotSize3, "Basic Long Entry3");
+                    }
+
                 }
                 if (LongExtraCondition1())
                 {
-                    Print("EXTRA LONGGGGGG~!!!!!!");
                     _longFourOrder = EnterLong(ExtraSize, "Extra Long Entry1");
                     _longFiveOrder = EnterLong(ExtraSize, "Extra Long Entry2");
                     _longSixOrder = EnterLong(ExtraSize, "Extra Long Entry3");
-                    _canExtra = false;
                     status = "Extra Long";
                 }
 
 
                 if (firstTrailConditionLong()) 
                 {
-                    Print("Moving stop to Breakeven");
                     SetStopLoss(CalculationMode.Price, _longEntryPrice1 + (1 * TickSize));
                     status = "Long Stop Breakeven";
                 }
             }
+
             if (UseShorts)
             {
                 if (ShortCondition1())
                 {
 
                     _shortOneOrder = EnterShort(LotSize1, "Basic Short Entry1");
-                    _shortTwoOrder = EnterShort(LotSize2, "Basic Short Entry2");
-                    _shortThreeOrder = EnterShort(LotSize3, "Basic Short Entry3");
-
+      //               _shortTwoOrder = EnterShort(LotSize2, "Basic Short Entry2");
+                    if (_doingGood)
+                    {
+                        _shortTwoOrder = EnterShort(LotSize2, "Basic Short Entry2");
+                        _shortThreeOrder = EnterShort(LotSize3, "Basic Short Entry3");
+                    }
                 }
 
                 if (ShortExtraCondition1())
                 {
-                    Print("EXTRA SHORTTTTT ~!!!!!!");
                     _shortFourOrder = EnterShort(ExtraSize, "Extra Short Entry1");
                     _shortFiveOrder = EnterShort(ExtraSize, "Extra Short Entry2");
                     _shortSixOrder = EnterShort(ExtraSize, "Extra Short Entry3");
-                    _canExtra = false;
                     status = "Extra Short";
                 }
 
                 if (firstTrailConditionShort())
                 { 
-                    Print("Moving stop to Breakeven");
-                    Print("Print TUTAJ KRUWA TUTAJ");
                     Print(_shortEntryPrice1);
-                    Print("NEW LEVEL SL");
                     Print(_shortEntryPrice1 - (3 * TickSize));
                      SetStopLoss(CalculationMode.Price, _shortEntryPrice1 - (1 * TickSize));
             
@@ -588,14 +648,14 @@ namespace NinjaTrader.NinjaScript.Strategies
         private bool ShortCondition1()
         {
             _stochFast = StochRSIMod2NT8(StochRsiPeriod, FastMAPeriod, SlowMAPeriod, LookBack).SK[1];
-            return (Position.MarketPosition == MarketPosition.Flat &&  _stochFast >= EntryFastStochValueShort && previousCandleRed()); //&& Closes[0][0] < _sma[0]; //|| (isDowntrend() && Position.MarketPosition == MarketPosition.Flat && _checkPointShort == true && _canTrade && _rsiEntry[0] <= EntryRsiValueShort - _thresholdShort - 1);
+            return (Position.MarketPosition == MarketPosition.Flat && _stochFast >= EntryFastStochValueShort && previousCandleRed()) && isDowntrend(); // && Position.MarketPosition == MarketPosition.Flat && _checkPointShort == true && _canTrade && _rsiEntry[0] <= EntryRsiValueShort - _thresholdShort - 1);
         }
 
 
         private bool LongCondition1()
         {
-         _stochFast = StochRSIMod2NT8(StochRsiPeriod, FastMAPeriod, SlowMAPeriod, LookBack).SK[1];
-          return (Position.MarketPosition == MarketPosition.Flat && _stochFast <= EntryFastStochValueLong && previousCandleGreen()); //&& Closes[0][0] > _sma[0]; // || (isUptrend() && Position.MarketPosition == MarketPosition.Flat && _checkPointLong == true &&  _canTrade && _rsiEntry[0] >= EntryRsiValueLong + _thresholdLong + 1 );
+            _stochFast = StochRSIMod2NT8(StochRsiPeriod, FastMAPeriod, SlowMAPeriod, LookBack).SK[1];
+            return (Position.MarketPosition == MarketPosition.Flat && _stochFast <= EntryFastStochValueLong && previousCandleGreen()) && isUptrend(); // || (isUptrend() && Position.MarketPosition == MarketPosition.Flat && _checkPointLong == true &&  _canTrade && _rsiEntry[0] >= EntryRsiValueLong + _thresholdLong + 1 );
         }
 
         #region onOrderUpdate
@@ -675,18 +735,23 @@ OrderState orderState, DateTime time, ErrorCode error, string comment)
         }
         #endregion
 
+        #region Stop Calculation
         private double calculateStopLong()
         {
             List<double> lows = new List<double> { Lows[0][1], Lows[0][2], Lows[0][3], Lows[0][4]};
             lows.Sort();
             double lowestLow = lows[0];
             double baseStopLoss = lowestLow - BaseStopMarginLong * TickSize;
-            Print("~~~~~~~~~");
-            Print("LOWEST LOW for Stop Loss:");
-            Print(lowestLow);
-            Print("Stop Loss Set at:");
-            Print(baseStopLoss);
-            Print("~~~~~~~~~");
+            if (_log)
+            {
+                Print("~~~~~~~~~");
+                Print("LOWEST LOW for Stop Loss:");
+                Print(lowestLow);
+                Print("Stop Loss Set at:");
+                Print(baseStopLoss);
+                Print("~~~~~~~~~");
+            }
+
 
             return baseStopLoss;
         }
@@ -698,15 +763,20 @@ OrderState orderState, DateTime time, ErrorCode error, string comment)
             highs.Reverse();
             double highestHigh = highs[0];
             double baseStopLoss = highestHigh + BaseStopMarginShort * TickSize;
-            Print("~~~~~~~~~");
-            Print("Highest High for Stop Loss:");
-            Print(highestHigh);
-            Print("Stop Loss Set at:");
-            Print(baseStopLoss);
-            Print("~~~~~~~~~");
+            if (_log)
+            {
+                Print("~~~~~~~~~");
+                Print("Highest High for Stop Loss:");
+                Print(highestHigh);
+                Print("Stop Loss Set at:");
+                Print(baseStopLoss);
+                Print("~~~~~~~~~");
+            }
 
             return highestHigh;
         }
+        #endregion
+
         #region Orders Conditions
 
         private bool IsLongOrder1(Order order)
@@ -822,7 +892,31 @@ OrderState orderState, DateTime time, ErrorCode error, string comment)
             }
         }
 
-private bool previousCandleRed()
+        private bool isUptrend()
+        {
+            if (UseEma)
+            {
+                return _emaMinDay[0] > _emaMaxDay[0] ;
+            }
+            else
+            {
+                return true;
+            }
+        }
+
+        private bool isDowntrend()
+        {
+            if (UseEma)
+            {
+                return  _emaMinDay[0] < _emaMaxDay[0];
+            }
+            else
+            {
+                return true;
+            }
+        }
+    
+        private bool previousCandleRed()
         {
             return Closes[1][0] <= Opens[1][0] && Closes[1][1] >= Opens[1][1];
         }
@@ -833,16 +927,37 @@ private bool previousCandleRed()
         }
 
 
+        private void filterHeikenAshi()
+        {
+            if (_useHeikenAshi)
+            {
+                if(Closes[3][0] <= Opens[3][0] && Closes[3][1] >= Opens[3][1]) //closing candle red after previous green on D1;
+                {
+                    UseLongs = false;
+                    UseShorts = true;
+                }
+                else if ( Closes[3][0] >= Opens[3][0] && Closes[3][1] <= Opens[3][1] ) ////closing candle green after previous red on D1;
+                {
+                    UseLongs = true;
+                    UseShorts = false;
+                }
+            }
+        }
 
         private void AddIndicators()
         {
             _emaMin = EMA(BarsArray[1],EmaMinPeriod);
             _emaMax = EMA(BarsArray[1],EmaMaxPeriod);
+            _emaMaxDay = EMA(BarsArray[2], EmaMaxPeriodDay);
+            _emaMinDay = EMA(BarsArray[2], EmaMinPeriodDay);
             _sma = SMA(BarsArray[0], 100);
             _pSar = ParabolicSAR(0.02, 0.2, 0.02);
             AddChartIndicator(_emaMin);
             AddChartIndicator(_emaMax);
+      //      AddChartIndicator(_emaMinDay);
+    //        AddChartIndicator(_emaMaxDay);
             AddChartIndicator(_pSar);
+         //   PlotBrushes[0][0] = Brushes.Blue;
         }
     }
 }
