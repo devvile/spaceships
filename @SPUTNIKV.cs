@@ -960,7 +960,7 @@ OrderState orderState, DateTime time, ErrorCode error, string comment)
             TimeZoneInfo berlinZone = TimeZoneInfo.FindSystemTimeZoneById("Central European Standard Time");
             DateTime berlinTime = TimeZoneInfo.ConvertTime(Time[0], berlinZone);
 
-            return berlinTime.Hour < 21 || (berlinTime.Hour == 21 && berlinTime.Minute <= 52);
+            return berlinTime.Hour < 21 || (berlinTime.Hour == 21 && berlinTime.Minute <= 50);
         }
 
         private void AddIndicators()
