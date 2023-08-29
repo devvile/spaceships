@@ -752,6 +752,7 @@ OrderState orderState, DateTime time, ErrorCode error, string comment)
             List<double> lows = new List<double> { Lows[0][1], Lows[0][2], Lows[0][3], Lows[0][4]};
             lows.Sort();
             double lowestLow = lows[0];
+
             double baseStopLoss = lowestLow - BaseStopMarginLong * TickSize;
             if (_log)
             {

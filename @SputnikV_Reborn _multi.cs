@@ -24,7 +24,7 @@ using System.ComponentModel;
 
 namespace NinjaTrader.NinjaScript.Strategies
 {
-    public class Sputnik_V_Reborn : Strategy
+    public class Sputnik_V_Multi : Strategy
     {
         #region Declarations
         private int _lotSize1;
@@ -37,6 +37,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         private Indicator _pSar;
         private Indicator _emaFast;
         private Indicator _emaSlow;
+        private Indicator _hmaFastDay;
+        private Indicator _hmaSlowDay;
 
         Random rnd = new Random();
         private int _aroonPeriod;
@@ -47,7 +49,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private bool _useLongs = true;
         private bool _useShorts = true;
         private bool _canExtra = true;
-        private bool _useEma = true;
+        private bool _useHMA = true;
         private double _stochFast;
 
         private int _emaFastPeriod;
@@ -99,9 +101,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         private int _slowMAPeriod;
         private int _lookBack;
         private string status = "Flat";
-        private int _emaFilterPeriod = 200;
 
-        //   private int _minuteIndex =0 ;
+     //   private int _minuteIndex =0 ;
         #endregion
 
 
@@ -136,14 +137,6 @@ namespace NinjaTrader.NinjaScript.Strategies
             set { _useRsi = value; }
         }
 
-
-        [Display(Name = "Use EMA", GroupName = "Config", Order = 0)]
-        public bool UseEMA
-        {
-            get { return _useEma; }
-            set { _useEma = value; }
-        }
-
         [Display(Name = "Can Extra", GroupName = "Config", Order = 0)]
         public bool CanExtra
         {
@@ -158,11 +151,11 @@ namespace NinjaTrader.NinjaScript.Strategies
             set { _makeTrades = value; }
         }
 
-        [Display(Name = "EMA Filter Period", GroupName = "Config", Order = 0)]
-        public int EMAFilterPeriod 
+        [Display(Name = "Use HMA", GroupName = "Config", Order = 0)]
+        public bool UseHMA
         {
-            get { return _emaFilterPeriod; }
-            set { _emaFilterPeriod = value; }
+            get { return _useHMA; }
+            set { _useHMA = value; }
         }
 
         #endregion
@@ -390,7 +383,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (State == State.SetDefaults)
             {
                 Description = @"Sputnik Refacatored";
-                Name = "Sputnik V reborn";
+                Name = "Sputnik V reborn multiframe";
                 Calculate = Calculate.OnBarClose;
                 _lotSize1 = 1;
                 _lotSize2 = 1;
@@ -428,7 +421,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 EntriesPerDirection = 6;
                 Calculate = Calculate.OnBarClose;
                 RealtimeErrorHandling = RealtimeErrorHandling.IgnoreAllErrors;
-      //          AddDataSeries(BarsPeriodType.Day, 1);
+                AddDataSeries(BarsPeriodType.Day, 1);
        //         AddDataSeries(BarsPeriodType.Tick, 1);
              //   AddHeikenAshi("MES 09-23", BarsPeriodType.Minute, 1, MarketDataType.Last);
             }
@@ -442,8 +435,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         protected override void OnBarUpdate()
         {
-            if (CurrentBar <= BarsRequiredToTrade) return;
+            if (CurrentBars[0] <= BarsRequiredToTrade || CurrentBars[1] <= BarsRequiredToTrade  ) return;
 
+            if(BarsInProgress == 0){ 
+
+        
                 if (UseLongs)
                 {
                     if (LongConditions())
@@ -506,14 +502,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                     }
                 }
 
-           
+            }
 
         }
         #region Entry Positions
 
         private bool LongConditions()
         {
-            return noPositions() && previousCandleGreen() && IsAroonUptrend() && stochRsiEntry(RsiEntryLong ,"Long") && IsEMAUptrend();
+            return noPositions() && previousCandleGreen() && IsAroonUptrend() && stochRsiEntry(RsiEntryLong ,"Long") && isHMAUptrend();
         }
 
         private bool LongExtraCondition1()
@@ -523,7 +519,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private bool ShortConditions()
         {
-            return noPositions() && previousCandleRed() && IsAroonDowntrend() && stochRsiEntry(RsiEntryShort, "Short") && IsEMADowntrend();
+            return noPositions() && previousCandleRed() && IsAroonDowntrend() && stochRsiEntry(RsiEntryShort, "Short") && isHMADowntrend();
         }
 
         private bool ShortExtraCondition1()
@@ -592,37 +588,36 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return true;
             }
 
-        }
+        } 
 
-        private bool IsEMAUptrend()
-        {
-            if (UseEMA)
-            {
-                return EMA(5)[0] > EMA(EMAFilterPeriod)[0];
-            }
-            else
-            {
-                return true;
-            }
-
-        }
-
-        private bool IsEMADowntrend()
-        {
-            if (UseEMA)
-            {
-                return EMA(5)[0] < EMA(EMAFilterPeriod)[0];
-            }
-            else
-            {
-                return true;
-            }
-        }
-
-
-            private bool noPositions()
+        private bool noPositions()
         {
             return Position.MarketPosition == MarketPosition.Flat;
+        }
+
+        private bool isHMAUptrend()
+        {
+            if (UseHMA)
+            {
+                return _hmaFastDay[0] > _hmaSlowDay[0];
+            }
+            else
+            {
+                return true;
+            }
+        }
+
+        private bool isHMADowntrend()
+        {
+
+            if (UseHMA)
+            {
+                return _hmaFastDay[0]< _hmaSlowDay[0];
+            }
+            else
+            {
+                return true;
+            }
         }
 
         private bool stochRsiEntry(int entryValue, string positionType )
@@ -814,20 +809,30 @@ OrderState orderState, DateTime time, ErrorCode error, string comment)
             double highestHigh = highs[0];
             double baseStopLoss = highestHigh + BaseStopMarginShort * TickSize;
 
-            return baseStopLoss;
+            return highestHigh;
         }
         #endregion
 
         private void addIndicators()
         {
-            _ha = HeikenAshi8();
+
+            _ha = HeikenAshi8(BarsArray[0]);
             _haD = HeikenAshi8();
-            _aroon = Aroon(AroonPeriod);
+            _aroon = Aroon(BarsArray[0],AroonPeriod);
             _stoch = StochRSIMod2NT8( StochRsiPeriod, FastMAPeriod, SlowMAPeriod, LookBack);
 
-            _pSar = ParabolicSAR( 0.02, 0.2, 0.02);
-            _emaFast = EMA( EmaFastPeriod);
-            _emaSlow = EMA(EmaSlowPeriod);
+            _pSar = ParabolicSAR(BarsArray[0], 0.02, 0.2, 0.02);
+            _emaFast = EMA(BarsArray[0], EmaFastPeriod);
+            _emaSlow = EMA(BarsArray[0],EmaSlowPeriod);
+            _hmaFastDay = HMA(BarsArray[1], 5);
+            _hmaSlowDay = HMA(BarsArray[1], 15);
+
+            if (UseHMA)
+            {
+                AddChartIndicator(_hmaFastDay);
+                AddChartIndicator(_hmaSlowDay);
+            }
+
 
             if (ShowHA)
             {

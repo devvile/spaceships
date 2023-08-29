@@ -36,6 +36,19 @@ namespace NinjaTrader.NinjaScript.Strategies
         private int _aroonPeriod;
         private bool _useAroon;
         private bool _showHA = true;
+        private bool _useRsi = false;
+        private double _stochFast;
+
+        private int _rsiEntryShort;
+
+        private int _rsiEntryLong;
+
+        private int _stochRsiPeriod;
+        private int _fastMAPeriod;
+        private int _slowMAPeriod;
+        private int _lookBack;
+
+
 
         #endregion
 
@@ -76,9 +89,59 @@ namespace NinjaTrader.NinjaScript.Strategies
             set { _useAroon = value; }
         }
 
+        [Display(Name = "Use RSI", GroupName = "Config", Order = 0)]
+        public bool UseRsi
+        {
+            get { return _useRsi; }
+            set { _useRsi = value; }
+        }
+
         #endregion
 
+        #region STOCH
 
+        [Display(Name = "RSI Period ", GroupName = "STOCH", Order = 0)]
+        public int StochRsiPeriod
+        {
+            get { return _stochRsiPeriod; }
+            set { _stochRsiPeriod = value; }
+        }
+
+        [Display(Name = "FastMAPeriod", GroupName = "STOCH", Order = 0)]
+        public int FastMAPeriod
+        {
+            get { return _fastMAPeriod; }
+            set { _fastMAPeriod = value; }
+        }
+
+        [Display(Name = "SlowMAPeriod", GroupName = "STOCH", Order = 0)]
+        public int SlowMAPeriod
+        {
+            get { return _slowMAPeriod; }
+            set { _slowMAPeriod = value; }
+        }
+
+        [Display(Name = "Look Back", GroupName = "STOCH", Order = 0)]
+        public int LookBack
+        {
+            get { return _lookBack; }
+            set { _lookBack = value; }
+        }
+        #endregion
+
+        [Display(Name = "Stoch Rsi Entry Value", GroupName = "Long", Order = 0)]
+        public int RsiEntryLong
+        {
+            get { return _rsiEntryLong; }
+            set { _rsiEntryLong = value; }
+        }
+
+        [Display(Name = "Stoch Rsi Entry Value", GroupName = "Short", Order = 0)]
+        public int RsiEntryShort
+        {
+            get { return _rsiEntryShort; }
+            set { _rsiEntryShort = value; }
+        }
 
 
         protected override void OnStateChange()
@@ -90,8 +153,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Name = "Apollo Reborn";
                 Calculate = Calculate.OnBarClose;
                 _positionSize = 2;
-                
-
+                _stochRsiPeriod = 9;
+                _fastMAPeriod = 3;
+                _slowMAPeriod = 3;
+                _lookBack = 14;
             }
 
             else if (State == State.Configure)
@@ -120,26 +185,50 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             if (LongConditions())
             {
-                MarkLong();
+                Mark("Long");
                // EnterLong(PositionSize);
             }
 
             else if (ShortConditions())
             {
-                MarkShort();
+                Mark("Short");
                // EnterShort(PositionSize);
+            }
+
+        }
+
+        private void Mark(string positionType)
+        {
+            int _nr = rnd.Next();
+            string rando = Convert.ToString(_nr);
+            string name = "tag " + rando;
+            if (positionType == "Short")
+            {
+                Draw.ArrowDown(this, name, true, 0, High[0] + TickSize, Brushes.Red);
+            }
+            else if (positionType == "Extra Short")
+            {
+                Draw.ArrowDown(this, name, true, 0, High[0] + TickSize, Brushes.Yellow);
+            }
+            else if (positionType == "Long")
+            {
+                Draw.ArrowUp(this, name, true, 0, Low[0] - TickSize, Brushes.Blue);
+            }
+            else if (positionType == "Extra Long")
+            {
+                Draw.ArrowUp(this, name, true, 0, Low[0] - TickSize, Brushes.Yellow);
             }
 
         }
 
         private bool LongConditions()
         {
-            return previousCandleGreen() && IsAroonUptrend();
+            return previousCandleGreen() && IsAroonUptrend() && stochRsiEntry(RsiEntryLong, "Long");
         }
 
         private bool ShortConditions()
         {
-            return previousCandleRed() && IsAroonDowntrend();
+            return previousCandleRed() && IsAroonDowntrend() && stochRsiEntry(RsiEntryShort, "Short");
         }
 
         private bool previousCandleRed()
@@ -152,20 +241,29 @@ namespace NinjaTrader.NinjaScript.Strategies
             return HeikenAshi8().HAOpen[0] < HeikenAshi8().HAClose[0] && HeikenAshi8().HAOpen[1] > HeikenAshi8().HAClose[1];
         }
 
-        private void MarkShort()
+        private bool stochRsiEntry(int entryValue, string positionType)
         {
-            int _nr = rnd.Next();
-            string rando = Convert.ToString(_nr);
-            string name = "tag " + rando;
-            Draw.ArrowDown(this, name, true, 0, Low[0] - TickSize, Brushes.Red);
-        }
+            if (UseRsi)
+            {
+                _stochFast = StochRSIMod2NT8(StochRsiPeriod, FastMAPeriod, SlowMAPeriod, LookBack).SK[1];
+                if (positionType == "Long")
+                {
+                    return _stochFast <= entryValue;
+                }
+                else if (positionType == "Short")
+                {
+                    return _stochFast >= entryValue;
+                }
+                else
+                {
+                    return false;
+                }
+            }
+            else
+            {
+                return true;
+            }
 
-        private void MarkLong()
-        {
-            int _nr = rnd.Next();
-            string rando = Convert.ToString(_nr);
-            string name = "tag " + rando;
-            Draw.ArrowUp(this, name, true, 0, Low[0] - TickSize, Brushes.Blue);
         }
 
         private bool IsAroonUptrend()
@@ -199,7 +297,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             _ha = HeikenAshi8();
 
             _aroon = Aroon( AroonPeriod);
-            _stoch = StochRSIMod2NT8(9, 3, 3, 14);
+            _stoch = StochRSIMod2NT8(StochRsiPeriod, FastMAPeriod, SlowMAPeriod, LookBack);
             AddChartIndicator(_aroon);
             if (ShowHA)
             {
