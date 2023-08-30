@@ -24,7 +24,7 @@ using System.ComponentModel;
 
 namespace NinjaTrader.NinjaScript.Strategies
 {
-    public class Sputnik_V_Reborn : Strategy
+    public class Sputnik_VI : Strategy
     {
         #region Declarations
         private int _lotSize1;
@@ -100,7 +100,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         private int _slowMAPeriod;
         private int _lookBack;
         private string status = "Flat";
-        private int _emaFilterPeriod = 200;
+        private int _hmaFilterPeriod = 50;
+        private bool _canTrade = false;
 
         //   private int _minuteIndex =0 ;
         #endregion
@@ -159,11 +160,11 @@ namespace NinjaTrader.NinjaScript.Strategies
             set { _makeTrades = value; }
         }
 
-        [Display(Name = "EMA Filter Period", GroupName = "Config", Order = 0)]
-        public int EMAFilterPeriod 
+        [Display(Name = "HMA Slow Filter Period", GroupName = "Config", Order = 0)]
+        public int HMAFilterPeriod 
         {
-            get { return _emaFilterPeriod; }
-            set { _emaFilterPeriod = value; }
+            get { return _hmaFilterPeriod; }
+            set { _hmaFilterPeriod = value; }
         }
 
         #endregion
@@ -391,7 +392,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (State == State.SetDefaults)
             {
                 Description = @"Sputnik Refacatored";
-                Name = "Sputnik V reborn";
+                Name = "Sputnik VI";
                 Calculate = Calculate.OnBarClose;
                 _lotSize1 = 1;
                 _lotSize2 = 1;
@@ -445,20 +446,30 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             if (CurrentBar <= BarsRequiredToTrade) return;
 
+            CalculateTradeTime();
+
+            if (_canTrade)
+            {
+                TradeLikeAKing();
+
+            }
+        }
+            private void TradeLikeAKing()
+            {
                 if (UseLongs)
                 {
                     if (LongConditions())
                     {
-                       if (makeTrades)
-                       {
-                          _longOneOrder = EnterLong(LotSize1, "Basic Long Entry1");
-                          _longTwoOrder = EnterLong(LotSize2, "Basic Long Entry2");
-                          _longThreeOrder = EnterLong(LotSize3, "Basic Long Entry3");
-                       }
-                       else
-                       {
-                          Mark("Long");
-                       }
+                        if (makeTrades)
+                        {
+                            _longOneOrder = EnterLong(LotSize1, "Basic Long Entry1");
+                            _longTwoOrder = EnterLong(LotSize2, "Basic Long Entry2");
+                            _longThreeOrder = EnterLong(LotSize3, "Basic Long Entry3");
+                        }
+                        else
+                        {
+                            Mark("Long");
+                        }
                     }
                     if (LongExtraCondition1())
                     {
@@ -469,7 +480,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                             _longSixOrder = EnterLong(ExtraSize, "Extra Long Entry3");
                             status = "Extra Long";
                         }
-                        else 
+                        else
                         {
                             Mark("Extra Long");
                         }
@@ -479,7 +490,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (UseShorts)
                 {
                     if (ShortConditions())
-                    { 
+                    {
                         if (makeTrades)
                         {
                             _shortOneOrder = EnterShort(LotSize1, "Basic Short Entry1");
@@ -500,16 +511,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                             _shortSixOrder = EnterShort(ExtraSize, "Extra Short Entry3");
                             status = "Extra Short";
                         }
-                        else 
+                        else
                         {
                             Mark("Extra Short");
                         }
                     }
                 }
 
-           
+            }
+        
 
-        }
         #region Entry Positions
 
         private bool LongConditions()
@@ -599,7 +610,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             if (UseHMA)
             {
-                return HMA(_hmaFast)[0] > HMA(EMAFilterPeriod)[0];
+                return HMA(_hmaFast)[0] > HMA(HMAFilterPeriod)[0];
             }
             else
             {
@@ -612,7 +623,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             if (UseHMA)
             {
-                return HMA(_hmaFast)[0] < HMA(EMAFilterPeriod)[0];
+                return HMA(_hmaFast)[0] < HMA(HMAFilterPeriod)[0];
             }
             else
             {
@@ -727,9 +738,25 @@ OrderState orderState, DateTime time, ErrorCode error, string comment)
 
         }
 
-        #region Orders Conditions
+        #region tradeTime
+        private void CalculateTradeTime()
+        {
 
-        private bool IsLongOrder1(Order order)
+            if ((ToTime(Time[0]) >= 152900 && ToTime(Time[0]) < 215000))
+            {
+                _canTrade = true;
+            }
+            else
+            {
+                _canTrade = false;
+            }
+        }
+
+#endregion
+
+#region Orders Conditions
+
+private bool IsLongOrder1(Order order)
         {
             return order == _longOneOrder;
         }
