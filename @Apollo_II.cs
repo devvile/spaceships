@@ -24,7 +24,7 @@ using System.ComponentModel;
 
 namespace NinjaTrader.NinjaScript.Strategies
 {
-    public class Apollo_REBORN : Strategy
+    public class Apollo_II : Strategy
     {
         #region Declarations
         private int LotSize1;
@@ -37,6 +37,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private Indicator _aroon;
         private Indicator _stoch;
         private Indicator _iczimoku;
+        private Indicator _atr;
 
         Random rnd = new Random();
         private int _aroonPeriod;
@@ -50,6 +51,11 @@ namespace NinjaTrader.NinjaScript.Strategies
         private double _stochFast;
         private bool _useStrongSignals;
         private bool _useWeakSignals;
+        private bool _useATR;
+
+        private int _atrPeriod;
+
+        private double stopLossPrice;
 
         private double _longEntryPrice1;
         private double _stopLossBaseLong;
@@ -60,7 +66,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private Order _longTwoOrder;
         private Order _longThreeOrder;
         private int _baseStopMarginLong;
-
+        private double _atrFilterValue;
 
         private double _shortEntryPrice1;
         private double _stopLossBaseShort;
@@ -71,6 +77,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         private Order _shortTwoOrder;
         private Order _shortThreeOrder;
         private int _baseStopMarginShort;
+        private List<Order> stopLossOrders;
+        private List<Order> profitTargetOrders;
 
         private int _extraSize;
         #endregion
@@ -122,7 +130,6 @@ namespace NinjaTrader.NinjaScript.Strategies
             get { return _useRsi; }
             set { _useRsi = value; }
         }
-
 
         [Display(Name = "Trade", GroupName = "Config", Order = 0)]
         public bool makeTrades
@@ -305,6 +312,30 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
         #endregion
 
+        #region Filters
+
+        [Display(Name = "ATR Filter", GroupName = "Filter", Order = 0)]
+        public bool UseATR
+        {
+            get { return _useATR; }
+            set { _useATR = value; }
+        }
+
+        [Display(Name = "ATR Period", GroupName = "Filter", Order = 0)]
+        public int AtrPeriod
+        {
+            get { return _atrPeriod; }
+            set { _atrPeriod = value; }
+        }
+
+        [Display(Name = "ATR Filter Value", GroupName = "Filter", Order = 0)]
+        public double AtrFilterValue
+        {
+            get { return _atrFilterValue; }
+            set { _atrFilterValue = value; }
+        }
+        #endregion
+
 
         protected override void OnStateChange()
         {
@@ -312,23 +343,25 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (State == State.SetDefaults)
             {
                 Description = @"Sputnik Refacatored";
-                Name = "Apollo Reborn";
+                Name = "Apollo II";
                 Calculate = Calculate.OnBarClose;
                 _userLotSize1 = 1;
-                _userLotSize2 = 1;
+                _userLotSize2 = 2;
                 _userLotSize3 = 1;
-                _profitTargetLong1 = 12;
-                _profitTargetLong2 = 12;
-                _profitTargetLong3 = 12;
-                _baseStopMarginLong = 18;
-                _baseStopMarginShort = 18;
-                _profitTargetShort1 = 12;
-                _profitTargetShort2 = 12;
-                _profitTargetShort3 = 12;
-                _stochRsiPeriod = 9;
+                _profitTargetLong1 = 22;
+                _profitTargetLong2 = 24;
+                _profitTargetLong3 = 80;
+                _baseStopMarginLong = 60;
+                _baseStopMarginShort = 44;
+                _profitTargetShort1 = 20;
+                _profitTargetShort2 = 24;
+                _profitTargetShort3 = 100;
+                _stochRsiPeriod = 8;
                 _fastMAPeriod = 3;
                 _slowMAPeriod = 3;
                 _lookBack = 14;
+                _atrPeriod = 10;
+                _atrFilterValue = 3;
 
                 _showHA = true;
                 _useRsi = true;
@@ -338,6 +371,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 _useIchimoku = true;
                 _useStrongSignals = true;
                 _useWeakSignals = true;
+                _useATR = true;
 
                 _aroonPeriod = 25;
                 _rsiEntryLong = 10;
@@ -351,6 +385,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 EntriesPerDirection = 6;
                 Calculate = Calculate.OnBarClose;
                 RealtimeErrorHandling = RealtimeErrorHandling.IgnoreAllErrors;
+                profitTargetOrders = new List<Order>();
+                stopLossOrders = new List<Order>();
+
             }
             else if (State == State.DataLoaded)
             {
@@ -368,6 +405,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             if (_canTrade)
             {
+                Print(ATR(20)[0]);
+                AdjustStop();
                 TradeLikeAKing();
 
             }
@@ -383,6 +422,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 NoIchimokuMode();
             }
+
         }
 
         private void IchimokuMode()
@@ -390,7 +430,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             signal = calculateSignal();
             if (signal!="No Singal")
             {
-                if (UseLongs && signal != "Strong Short" && signal != "Weak Short" && noPositions() && previousCandleGreen() && stochRsiEntry(RsiEntryLong, "Long"))
+                if (UseLongs && signal != "Strong Short" && signal != "Weak Short" && noPositions() && previousCandleGreen() && stochRsiEntry(RsiEntryLong, "Long") && applyFilters())
                 {
                     if(UseStrongSignals && signal =="Strong Long")
                     {
@@ -425,7 +465,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     }
 
                 }
-                else if(UseShorts && signal != "Strong Long" && signal != "Weak Long" && noPositions() && previousCandleRed() && stochRsiEntry(RsiEntryShort, "Short"))
+                else if(UseShorts && signal != "Strong Long" && signal != "Weak Long" && noPositions() && previousCandleRed() && stochRsiEntry(RsiEntryShort, "Short") && applyFilters())
                 {
                     if (UseStrongSignals && signal == "Strong Short")
                     {
@@ -435,7 +475,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                             _shortOneOrder = EnterShort(LotSize1, "Short1");
                             _shortTwoOrder = EnterShort(LotSize2, "Short2");
                             _shortThreeOrder = EnterShort(LotSize3, "Short3");
-                            ShowEntryDetails(signal);
+       //                     ShowEntryDetails(signal);
                         }
                         else
                         {
@@ -450,7 +490,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                             setSmallPositionSizes();
                             _shortOneOrder = EnterShort(LotSize1, "Short1");
                             _shortTwoOrder = EnterShort(LotSize2, "Short2");
-                            ShowEntryDetails(signal);
+         //                   ShowEntryDetails(signal);
                         }
                         else
                         {
@@ -462,6 +502,27 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
         }  
 
+        private void AdjustStop()
+        {
+            if (noPositions())
+            {
+                status = "Flat";
+                SetStopLoss(CalculationMode.Ticks, 40);
+            }
+            else if(status == "Short Default")
+            {
+                SetStopLoss(CalculationMode.Price, stopLossPrice);
+            }
+            else if (status == "Breakeven")
+            {
+                SetStopLoss(CalculationMode.Price, Position.AveragePrice);
+            }
+            else if (status == "Long Default")
+            {
+                SetStopLoss(CalculationMode.Price, stopLossPrice);
+            }
+        }
+
         private void setUserPoisitonSizes()
         {
             LotSize1 = UserLotSize1;
@@ -469,11 +530,31 @@ namespace NinjaTrader.NinjaScript.Strategies
             LotSize3 = UserLotSize3;
         }
 
+
         private void setSmallPositionSizes()
         {
             LotSize1 = 1;
             LotSize2 = 1;
             LotSize3 = 1;
+        }
+
+        private bool applyFilters()
+        {
+            if (UseATR)
+            {
+               if (_atr[0] >= AtrFilterValue)
+                {
+                    return true;
+                }
+                else
+                {
+                    return false;
+                }
+            }
+            else
+            {
+                return true;
+            }
         }
 
         private string calculateSignal()
@@ -488,7 +569,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             if(conversionLine > baseline && cloud == "Green" && IsAroonUptrend())
             {
                 signalType = "Strong Long";
-            }else if(conversionLine > baseline && cloud =="Red" && IsAroonUptrend())
+            }
+            else if(conversionLine > baseline && cloud =="Red" && IsAroonUptrend())
             {
                 signalType = "Weak Long";
             }
@@ -496,10 +578,11 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 signalType = "Weak Long";
             }
-            else if (conversionLine < baseline && cloud == "Green" && IsAroonUptrend())
+        /*    else if (conversionLine < baseline && cloud == "Green" && IsAroonUptrend())
             {
                 signalType = "Weak Long";
             }
+        */
             else if (conversionLine < baseline && cloud == "Red" && IsAroonDowntrend())
             {
                 signalType = "Strong Short";
@@ -511,11 +594,11 @@ namespace NinjaTrader.NinjaScript.Strategies
             else if (conversionLine < baseline && cloud == "Green" && IsAroonDowntrend())
             {
                 signalType = "Weak Short";
-            }
+            }/*
             else if (conversionLine > baseline && cloud == "Red" && IsAroonDowntrend())
             {
                 signalType = "Weak Short";
-            }
+            }*/
 
 
             return signalType;
@@ -718,64 +801,49 @@ private bool stochRsiEntry(int entryValue, string positionType)
 protected override void OnOrderUpdate(Order order, double limitPrice, double stopPrice, int quantity, int filled, double averageFillPrice,
 OrderState orderState, DateTime time, ErrorCode error, string comment)
 {
-if (OrderFilled(order) && IsLongOrder1(order))
-{
-    _longEntryPrice1 = averageFillPrice;
-    _stopLossBaseLong = calculateStopLong();
-    SetStopLoss("Long1", CalculationMode.Price, _stopLossBaseLong, false);
-    SetProfitTarget("Long1", CalculationMode.Ticks, ProfitTargetLong1);
-    status = "Long1";
-}
-else if (OrderFilled(order) && IsLongOrder2(order))
-{
-    SetStopLoss("Long2", CalculationMode.Price, _stopLossBaseLong, false);
-    SetProfitTarget("Long2", CalculationMode.Ticks, ProfitTargetLong2);
-}
-else if (OrderFilled(order) && IsLongOrder3(order))
-{
-    SetStopLoss("Long3", CalculationMode.Price, _stopLossBaseLong, false);
-    SetProfitTarget("Long3", CalculationMode.Ticks, ProfitTargetLong3);
-}
+    if (OrderFilled(order) && IsLongOrder1(order))
+    {
+        _longEntryPrice1 = averageFillPrice;
+        stopLossPrice = calculateStopLong();
+        SetProfitTarget("Long1", CalculationMode.Ticks, ProfitTargetLong1);
+        status = "Long Default";
+    }
+    else if (OrderFilled(order) && IsLongOrder2(order))
+    {
+        SetProfitTarget("Long2", CalculationMode.Ticks, ProfitTargetLong2);
+    }
+    else if (OrderFilled(order) && IsLongOrder3(order))
+    {
+        SetProfitTarget("Long3", CalculationMode.Ticks, ProfitTargetLong3);
+    } 
 
-else if (OrderFilled(order) && IsShortOrder1(order))
-{
-    _shortEntryPrice1 = averageFillPrice;
-    _stopLossBaseShort = calculateStopShort();
-    SetStopLoss("Short1", CalculationMode.Price, _stopLossBaseShort, false);
-    SetProfitTarget("Short1", CalculationMode.Ticks, ProfitTargetShort1);
-    status = "Short 1 Default";
-}
-else if (OrderFilled(order) && IsShortOrder2(order))
-{
-    SetStopLoss("Short2", CalculationMode.Price, _stopLossBaseShort, false);
-    SetProfitTarget("Short2", CalculationMode.Ticks, ProfitTargetShort2);
-}
-else if (OrderFilled(order) && IsShortOrder3(order))
-{
-    SetStopLoss("Short3", CalculationMode.Price, _stopLossBaseShort, false);
-    SetProfitTarget("Short3", CalculationMode.Ticks, ProfitTargetShort3);
-}
+    else if (OrderFilled(order) && IsShortOrder1(order))
+    {
+        _shortEntryPrice1 = averageFillPrice;
+        stopLossPrice = calculateStopShort();
+        SetProfitTarget("Short1", CalculationMode.Ticks, ProfitTargetShort1);
+        status = "Short Default";
+    }
+    else if (OrderFilled(order) && IsShortOrder2(order))
+    {
+        SetProfitTarget("Short2", CalculationMode.Ticks, ProfitTargetShort2);
+    }
+    else if (OrderFilled(order) && IsShortOrder3(order))
+    {
+        SetProfitTarget("Short3", CalculationMode.Ticks, ProfitTargetShort3);
+    }
 
-}
+            //   MonitorStopProfit(order, limitPrice, stopPrice);
+    //        MoveStopToBreakeven(order);
 
-/*
-* 
-* 
-* Calculate the Conversion Line and the Base Line.
-Calculate Leading Span A based on the prior calculations. Once calculated, this data point is plotted 26 periods into the future.
-Calculate Leading Span B. Plot this data point 26 periods into the future.
-For the Lagging Span, plot the closing price 26 periods into the past on the chart.
-The difference between Leading Span A and Leading Span B is colored in to create the cloud.
-When Leading Span A is above Leading Span B, color the cloud green. When Leading Span A is below Leading Span B, color the cloud red.
-The above steps will create one data point. To create the lines, as each period comes to an end, go through the steps again to create new data points for that period. Connect the data points to each other to create the lines and cloud appearance.
+ }
 
-*/
 
             #region tradeTime
             private void CalculateTradeTime()
         {
 
-            if ((ToTime(Time[0]) >= 152900 && ToTime(Time[0]) < 210000))
+            if ((ToTime(Time[0]) >= 153000 && ToTime(Time[0]) < 210000))
             {
                 _canTrade = true;
             }
@@ -890,6 +958,69 @@ The above steps will create one data point. To create the lines, as each period 
             Print("~~~~~~~~~~~~~~~~~~~~~~~~");
         }
 
+        private void MonitorStopProfit(Order order, double limitPrice, double stopPrice)
+        {
+            if (order.OrderState == OrderState.Submitted)
+            {
+                // Add the "Stop loss" orders to the Stop Loss collection
+                if (order.Name == "Stop loss")
+                    stopLossOrders.Add(order);
+
+                // Add the "Profit target" orders to the Profit Target collection
+                else if (order.Name == "Profit target")
+                    profitTargetOrders.Add(order);
+            }
+
+            // Process stop loss orders
+            if (stopLossOrders.Contains(order))
+            {
+                // Check order for terminal state
+                if (order.OrderState == OrderState.Cancelled || order.OrderState == OrderState.Filled || order.OrderState == OrderState.Rejected)
+                {
+                    // Print out information about the order
+                    Print(order);
+
+                    // Remove from collection
+                    stopLossOrders.Remove(order);
+                }
+
+                else
+                {
+                    // Print out the current stop loss price
+                    Print("The order name " + order.Name + " stop price is currently " + stopPrice);
+                }
+            }
+
+            // Process profit target orders
+            if (profitTargetOrders.Contains(order))
+            {
+                // Check order for terminal state
+                if (order.OrderState == OrderState.Cancelled || order.OrderState == OrderState.Filled || order.OrderState == OrderState.Rejected)
+                {
+                    // Print out information about the order
+                    Print(order);
+
+                    // Remove from collection
+                    profitTargetOrders.Remove(order);
+                }
+                else
+                {
+                    // Print out the current stop loss price
+                    Print("The order name " + order.Name + " limit price is currently " + limitPrice);
+                }
+            }
+        }
+
+        private void MoveStopToBreakeven(Order order)
+        {
+            if (order.Name == "Profit target" && order.OrderState == OrderState.Filled)
+            {
+                status = "Breakeven";
+                stopLossPrice = Position.AveragePrice;
+            }
+        }
+		
+
         private void addIndicators()
         {
             _ha = HeikenAshi8();
@@ -912,7 +1043,11 @@ The above steps will create one data point. To create the lines, as each period 
             {
                 AddChartIndicator(_iczimoku);
             }
-
+            if (UseATR)
+            {
+                _atr = ATR(AtrPeriod);
+                AddChartIndicator(_atr);
+            }
 
 
 
