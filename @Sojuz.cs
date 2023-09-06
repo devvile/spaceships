@@ -77,8 +77,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private int _stopLong = 40;
         private int _stopShort = 40;
+        private int _targetLong1 = 40;
+    private int _targetShort1 = 40;
 
-        private int BarNr = 0;  //sprawdzic <-----
+private int BarNr = 0;  //sprawdzic <-----
         Random rnd = new Random();
 
         private string status = "Flat";
@@ -113,6 +115,14 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
 
 
+        [Display(Name = "Target1 Long", GroupName = "LONGS", Order = 0)]
+        public int TargetLong1
+        {
+            get { return _targetLong1; }
+            set { _targetLong1 = value; }
+        }
+
+
         #endregion
 
         #region Shorts
@@ -131,6 +141,12 @@ namespace NinjaTrader.NinjaScript.Strategies
             set { _stopShort = value; }
         }
 
+        [Display(Name = "Target1 Short", GroupName = "SHORTS", Order = 0)]
+        public int TargetShort1
+        {
+            get { return _targetShort1; }
+            set { _targetShort1 = value; }
+        }
 
 
         #endregion
@@ -386,7 +402,7 @@ OrderState orderState, DateTime time, ErrorCode error, string comment)
             if (OrderFilled(order) && IsLongOrder1(order))
             {
                 SetStopLoss("Long1", CalculationMode.Ticks, StopLong, false);
-
+                SetProfitTarget("Long1", CalculationMode.Ticks, TargetLong1);
             }
             else if (OrderFilled(order) && IsLongOrder2(order))
             {
@@ -397,6 +413,7 @@ OrderState orderState, DateTime time, ErrorCode error, string comment)
             else if (OrderFilled(order) && IsShortOrder1(order))
             {
                 SetStopLoss("Short1", CalculationMode.Ticks, StopShort, false);
+                SetProfitTarget("Short1", CalculationMode.Ticks, TargetShort1);
             }
             else if (OrderFilled(order) && IsShortOrder2(order))
             {
