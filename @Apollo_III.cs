@@ -24,7 +24,7 @@ using System.ComponentModel;
 
 namespace NinjaTrader.NinjaScript.Strategies
 {
-    public class Apollo_II : Strategy
+    public class Apollo_III : Strategy
     {
         #region Declarations
         private int LotSize1;
@@ -52,7 +52,6 @@ namespace NinjaTrader.NinjaScript.Strategies
         private bool _useStrongSignals;
         private bool _useWeakSignals;
         private bool _useATR;
-        private int _x = 8;
 
         private int _atrPeriod;
 
@@ -66,8 +65,11 @@ namespace NinjaTrader.NinjaScript.Strategies
         private Order _longOneOrder;
         private Order _longTwoOrder;
         private Order _longThreeOrder;
-        private int _baseStopMarginLong;
+        private int _longStopMargin;
         private double _atrFilterValue;
+        private int _maxLossMargin;
+        private double maxLossStop;
+        private int _barsToCheck;
 
         private double _shortEntryPrice1;
         private double _stopLossBaseShort;
@@ -77,7 +79,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private Order _shortOneOrder;
         private Order _shortTwoOrder;
         private Order _shortThreeOrder;
-        private int _baseStopMarginShort;
+        private int _shortStopMargin;
         private List<Order> stopLossOrders;
         private List<Order> profitTargetOrders;
 
@@ -102,6 +104,13 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 
         #region Config
+
+        [Display(Name = "Bars to Check", GroupName = "Position Management", Order = 0)]
+        public int BarsToCheck
+        {
+            get { return _barsToCheck; }
+            set { _barsToCheck = value; }
+        }
 
         [Display(Name = "Aroon Period", GroupName = "Config", Order = 4)]
         public int AroonPeriod
@@ -188,6 +197,12 @@ namespace NinjaTrader.NinjaScript.Strategies
             set { _userLotSize3 = value; }
         }
 
+        [Display(Name = "Max Loss Margin", GroupName = "Max Loss Margin", Order = 0)]
+        public int MaxLossMargin
+        {
+            get { return _maxLossMargin; }
+            set { _maxLossMargin = value; }
+        }
 
 
         #endregion
@@ -229,11 +244,11 @@ namespace NinjaTrader.NinjaScript.Strategies
             set { _profitTargetLong3 = value; }
         }
 
-        [Display(Name = "Base Stop Margin", GroupName = "Long", Order = 0)]
-        public int BaseStopMarginLong
+        [Display(Name = "Dynamic Stop Margin", GroupName = "Long", Order = 0)]
+        public int LongStopMargin
         {
-            get { return _baseStopMarginLong; }
-            set { _baseStopMarginLong = value; }
+            get { return _longStopMargin; }
+            set { _longStopMargin = value; }
         }
 
         #endregion
@@ -274,11 +289,11 @@ namespace NinjaTrader.NinjaScript.Strategies
             set { _profitTargetShort3 = value; }
         }
 
-        [Display(Name = "Base Stop Margin", GroupName = "Short", Order = 0)]
-        public int BaseStopMarginShort
+        [Display(Name = "Dynamic Stop Margin", GroupName = "Short", Order = 0)]
+        public int ShortStopMargin
         {
-            get { return _baseStopMarginShort; }
-            set { _baseStopMarginShort = value; }
+            get { return _shortStopMargin; }
+            set { _shortStopMargin = value; }
         }
 
 
@@ -346,7 +361,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (State == State.SetDefaults)
             {
                 Description = @"Sputnik Refacatored";
-                Name = "Apollo II";
+                Name = "Apollo III";
                 Calculate = Calculate.OnBarClose;
                 _userLotSize1 = 1;
                 _userLotSize2 = 2;
@@ -354,8 +369,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 _profitTargetLong1 = 22;
                 _profitTargetLong2 = 24;
                 _profitTargetLong3 = 80;
-                _baseStopMarginLong = 60;
-                _baseStopMarginShort = 44;
+                _longStopMargin = 60;
+                _shortStopMargin = 44;
                 _profitTargetShort1 = 20;
                 _profitTargetShort2 = 24;
                 _profitTargetShort3 = 100;
@@ -365,6 +380,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 _lookBack = 14;
                 _atrPeriod = 10;
                 _atrFilterValue = 3;
+                _maxLossMargin = 60;
+                _barsToCheck = 60;
 
                 _showHA = true;
                 _useRsi = true;
@@ -406,6 +423,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             CalculateTradeTime();
 
+     //       Print("Ariion");
+     //       Print(Aroon(AroonPeriod).Up[0]);
             if (_canTrade)
             {
                 Print(ATR(20)[0]);
@@ -569,16 +588,15 @@ namespace NinjaTrader.NinjaScript.Strategies
             double baseline =  ApolloIchimoku(9, 26, 52, 26).BaseLine[0];
             string cloud = calculateCloud(recentSpanA, recentSpanB);
 
-            if(conversionLine > baseline && cloud == "Green" && IsAroonUptrend())
+            if (conversionLine > baseline && cloud == "Green" && IsAroonUptrend())
             {
                 signalType = "Strong Long";
             }
-            else if(conversionLine > baseline && cloud =="Red" && IsAroonUptrend())
+            else if (conversionLine > baseline && cloud == "Red" && IsAroonUptrend())
             {
                 signalType = "Weak Long";
             }
-
-           else if (conversionLine > baseline && cloud == "Green" && IsAroonDowntrend())
+            else if (conversionLine > baseline && cloud == "Green" && IsAroonDowntrend())
             {
                 signalType = "Weak Long";
             }
@@ -596,10 +614,13 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 signalType = "Weak Short";
             }
-           else if (conversionLine < baseline && cloud == "Red" && IsAroonUptrend())
+              
+                else if (conversionLine < baseline && cloud == "Red" && IsAroonUptrend())
             {
                 signalType = "Weak Short";
-            } /*
+            }
+
+              /*
             else if (conversionLine > baseline && cloud == "Red" && IsAroonDowntrend())
             {
                 signalType = "Weak Short";
@@ -676,13 +697,13 @@ namespace NinjaTrader.NinjaScript.Strategies
 
     private bool LongConditions()
     {
-            return noPositions() && previousCandleGreen() && IsAroonUptrend() && stochRsiEntry(RsiEntryLong, "Long"); 
+    return noPositions() && previousCandleGreen() && IsAroonUptrend() && stochRsiEntry(RsiEntryLong, "Long"); 
     }
 
 
     private bool ShortConditions()
     {
-            return noPositions() && previousCandleRed() && IsAroonDowntrend() &&  stochRsiEntry(RsiEntryShort, "Short");
+    return noPositions() && previousCandleRed() && IsAroonDowntrend() && stochRsiEntry(RsiEntryShort, "Short");
     }
 
 
@@ -746,34 +767,34 @@ private void Mark(string positionType)
 }
 
 
-        private bool IsAroonUptrend()
-        {
-            if (UseAroon)
-            {
-                return Aroon(AroonPeriod).Up[0] > Aroon(AroonPeriod).Down[0];
-            }
-            else
-            {
-                return true;
-            }
+private bool IsAroonUptrend()
+{
+if (UseAroon)
+{
+    return Aroon(AroonPeriod).Up[0] > 70;
+}
+else
+{
+    return true;
+}
 
-        }
+}
 
-        private bool IsAroonDowntrend()
-        {
-            if (UseAroon)
-            {
-                return Aroon(AroonPeriod).Up[0] < Aroon(AroonPeriod).Down[0];
-            }
-            else
-            {
-                return true;
-            }
+private bool IsAroonDowntrend()
+{
+if (UseAroon)
+{
+    return Aroon(AroonPeriod).Down[0] > 70;
+}
+else
+{
+    return true;
+}
 
-        }
+}
 
 
-        private bool noPositions()
+private bool noPositions()
 {
 return Position.MarketPosition == MarketPosition.Flat;
 }
@@ -904,23 +925,53 @@ OrderState orderState, DateTime time, ErrorCode error, string comment)
         #region Stop Calculation
         private double calculateStopLong()
         {
-            List<double> lows = new List<double> { Low[0], Low[1], Low[2], Low[3], Low[4] };
-            lows.Sort();
-            double lowestLow = lows[0];
-            double baseStopLoss = lowestLow - BaseStopMarginLong * TickSize;
+            List<double> lows = new List<double> { };
+            int i = 0;
+            while (i < BarsToCheck)
+            {
+                lows.Add(Low[i]);
 
-            return baseStopLoss;
+                i++; // increment
+            }
+            lows.Sort();
+
+            double dynamicStopLoss =  lows[0] - LongStopMargin * TickSize;
+            double maxStopLoss = _longEntryPrice1 - MaxLossMargin * TickSize;
+
+            if(dynamicStopLoss < maxStopLoss) {
+                return maxStopLoss;
+            }
+            else
+            {
+                return dynamicStopLoss;
+            }
         }
 
         private double calculateStopShort()
         {
-            List<double> highs = new List<double> { High[0], High[1], High[2], High[3], High[4] };
+            List<double> highs = new List<double> { };
+            int i = 0;
+            while (i < BarsToCheck)
+            {
+                highs.Add(High[i]);
+
+                i++; // increment
+            }
             highs.Sort();
             highs.Reverse();
             double highestHigh = highs[0];
-            double baseStopLoss = highestHigh + BaseStopMarginShort * TickSize;
 
-            return baseStopLoss;
+            double dynamicStopLoss = highestHigh + ShortStopMargin * TickSize;
+            double maxStopLoss = _shortEntryPrice1 + MaxLossMargin * TickSize;
+
+            if (dynamicStopLoss > maxStopLoss)
+            {
+                return maxStopLoss;
+            }
+            else
+            {
+                return dynamicStopLoss;
+            }
         }
         #endregion
 

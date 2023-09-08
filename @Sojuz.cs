@@ -31,11 +31,13 @@ namespace NinjaTrader.NinjaScript.Strategies
         private Indicator _aroon;
         private Indicator _fastHMA;
         private Indicator _slowHMA;
+        private Indicator _slowestHMA;
         private Indicator _ha;
 
 
         private int _FastHMAPeriod;
         private int _SlowHMAPeriod;
+        private int _SlowestHMAPeriod;
 
 
         private double _aroonDown;
@@ -210,6 +212,12 @@ private int BarNr = 0;  //sprawdzic <-----
             set { _SlowHMAPeriod = value; }
         }
 
+        [Display(Name = "HMA SLowest Period", GroupName = "Filters", Order = 0)]
+        public int SlowestHMAPeriod
+        {
+            get { return _SlowestHMAPeriod; }
+            set { _SlowestHMAPeriod = value; }
+        }
         #endregion
 
 
@@ -223,7 +231,11 @@ private int BarNr = 0;  //sprawdzic <-----
                 Name = "Sojuz";
                 Calculate = Calculate.OnBarClose;
 
-            }
+                _FastHMAPeriod = 5;
+               _SlowHMAPeriod = 25;
+               _SlowestHMAPeriod= 100;
+
+    }
 
             else if (State == State.Configure)
             {
@@ -258,18 +270,19 @@ private int BarNr = 0;  //sprawdzic <-----
             if (Position.MarketPosition == MarketPosition.Long && CrossAbove(_slowHMA, _fastHMA, 1)) 
             {
                 ExitLong("Long1");
-            }else if(Position.MarketPosition == MarketPosition.Long && CrossAbove(Aroon(AroonPeriod).Down, Aroon(AroonPeriod).Up, 1))
+            }else if(Position.MarketPosition == MarketPosition.Long && (CrossAbove(Aroon(AroonPeriod).Down, Aroon(AroonPeriod).Up, 1)  || CrossAbove(Aroon(AroonPeriod).Down, Aroon(AroonPeriod).Up, 2)))
             {
-        //        Mark("Short");
-                ExitLong("Long2");
+                Mark("Short");
                 ExitLong("Long1");
+                ExitLong("Long2");
+
             }
 
             if (Position.MarketPosition == MarketPosition.Short && CrossAbove(_fastHMA, _slowHMA, 1))
             {
                 ExitShort("Short1");
             }
-            else if (Position.MarketPosition == MarketPosition.Short && CrossAbove(Aroon(AroonPeriod).Up, Aroon(AroonPeriod).Down, 1))
+            else if (Position.MarketPosition == MarketPosition.Short && (CrossAbove(Aroon(AroonPeriod).Up, Aroon(AroonPeriod).Down, 2) || CrossAbove(Aroon(AroonPeriod).Up, Aroon(AroonPeriod).Down, 1)))
             {
        //         Mark("Long");
                 ExitShort("Short2");
@@ -383,12 +396,12 @@ private int BarNr = 0;  //sprawdzic <-----
 
         private bool hmaLong()
         {
-            return _fastHMA[0]> _slowHMA[0];
+            return _fastHMA[0] > _slowHMA[0] && _slowHMA[0] > _slowestHMA[0];
         }
 
         private bool hmaShort()
         {
-            return _fastHMA[0] < _slowHMA[0];
+            return _fastHMA[0] < _slowHMA[0] && _slowHMA[0] < _slowestHMA[0];
         }
 
         private bool noPositions()
@@ -451,7 +464,7 @@ OrderState orderState, DateTime time, ErrorCode error, string comment)
         private void CalculateTradeTime()
         {
 
-            if ((ToTime(Time[0]) >= 153000 && ToTime(Time[0]) < 210000))
+            if ((ToTime(Time[0]) >= 153000 && ToTime(Time[0]) < 213000))
             {
                 _canTrade = true;
             }
@@ -473,8 +486,10 @@ OrderState orderState, DateTime time, ErrorCode error, string comment)
             {
                 _fastHMA = HMA(FastHMAPeriod);
                 _slowHMA = HMA(SlowHMAPeriod);
+                _slowestHMA = HMA(SlowestHMAPeriod);
                 AddChartIndicator(_fastHMA);
                 AddChartIndicator(_slowHMA);
+                AddChartIndicator(_slowestHMA);
             }
 
             if (ShowHA)

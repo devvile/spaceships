@@ -24,7 +24,7 @@ using System.ComponentModel;
 
 namespace NinjaTrader.NinjaScript.Strategies
 {
-    public class Apollo_II : Strategy
+    public class Apollo_II_RSI : Strategy
     {
         #region Declarations
         private int LotSize1;
@@ -346,7 +346,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (State == State.SetDefaults)
             {
                 Description = @"Sputnik Refacatored";
-                Name = "Apollo II";
+                Name = "Apollo II RSI";
                 Calculate = Calculate.OnBarClose;
                 _userLotSize1 = 1;
                 _userLotSize2 = 2;
@@ -433,7 +433,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             signal = calculateSignal();
             if (signal!="No Singal")
             {
-                if (UseLongs && signal != "Strong Short" && signal != "Weak Short" && noPositions() && previousCandleGreen() && stochRsiEntry(RsiEntryLong, "Long") && applyFilters())
+                if (UseLongs && signal != "Strong Short" && signal != "Weak Short" && noPositions() && previousCandleGreen() && RsiEntry("Long") && applyFilters())
                 {
                     if(UseStrongSignals && signal =="Strong Long")
                     {
@@ -468,7 +468,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     }
 
                 }
-                else if(UseShorts && signal != "Strong Long" && signal != "Weak Long" && noPositions() && previousCandleRed() && stochRsiEntry(RsiEntryShort, "Short") && applyFilters())
+                else if(UseShorts && signal != "Strong Long" && signal != "Weak Long" && noPositions() && previousCandleRed() && RsiEntry("Short") && applyFilters())
                 {
                     if (UseStrongSignals && signal == "Strong Short")
                     {
@@ -577,8 +577,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 signalType = "Weak Long";
             }
-
-           else if (conversionLine > baseline && cloud == "Green" && IsAroonDowntrend())
+            else if (conversionLine > baseline && cloud == "Green" && IsAroonDowntrend())
             {
                 signalType = "Weak Long";
             }
@@ -591,15 +590,14 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 signalType = "Strong Short";
             }
-
-            else if (conversionLine < baseline && cloud == "Green" && IsAroonDowntrend())
+            else if (conversionLine < baseline && cloud == "Red" && IsAroonUptrend())
             {
                 signalType = "Weak Short";
             }
-           else if (conversionLine < baseline && cloud == "Red" && IsAroonUptrend())
+            else if (conversionLine < baseline && cloud == "Green" && IsAroonDowntrend())
             {
                 signalType = "Weak Short";
-            } /*
+            }/*
             else if (conversionLine > baseline && cloud == "Red" && IsAroonDowntrend())
             {
                 signalType = "Weak Short";
@@ -676,13 +674,13 @@ namespace NinjaTrader.NinjaScript.Strategies
 
     private bool LongConditions()
     {
-            return noPositions() && previousCandleGreen() && IsAroonUptrend() && stochRsiEntry(RsiEntryLong, "Long"); 
+            return noPositions() && previousCandleGreen() && IsAroonUptrend() && RSI(_x, 1)[0] < 30;//stochRsiEntry(RsiEntryLong, "Long"); 
     }
 
 
     private bool ShortConditions()
     {
-            return noPositions() && previousCandleRed() && IsAroonDowntrend() &&  stochRsiEntry(RsiEntryShort, "Short");
+            return noPositions() && previousCandleRed() && IsAroonDowntrend() && RSI(_x, 1)[0] > 70;// stochRsiEntry(RsiEntryShort, "Short");
     }
 
 
@@ -746,34 +744,34 @@ private void Mark(string positionType)
 }
 
 
-        private bool IsAroonUptrend()
-        {
-            if (UseAroon)
-            {
-                return Aroon(AroonPeriod).Up[0] > Aroon(AroonPeriod).Down[0];
-            }
-            else
-            {
-                return true;
-            }
+private bool IsAroonUptrend()
+{
+if (UseAroon)
+{
+    return Aroon(AroonPeriod).Up[0] > Aroon(AroonPeriod).Down[0];
+}
+else
+{
+    return true;
+}
 
-        }
+}
 
-        private bool IsAroonDowntrend()
-        {
-            if (UseAroon)
-            {
-                return Aroon(AroonPeriod).Up[0] < Aroon(AroonPeriod).Down[0];
-            }
-            else
-            {
-                return true;
-            }
+private bool IsAroonDowntrend()
+{
+if (UseAroon)
+{
+    return Aroon(AroonPeriod).Up[0] < Aroon(AroonPeriod).Down[0];
+}
+else
+{
+    return true;
+}
 
-        }
+}
 
 
-        private bool noPositions()
+private bool noPositions()
 {
 return Position.MarketPosition == MarketPosition.Flat;
 }
@@ -802,6 +800,28 @@ private bool stochRsiEntry(int entryValue, string positionType)
     }
 
 }
+        private bool RsiEntry(string sig)
+        {
+            if(sig == "Long")
+            {
+                Print("IN CHECK RSI");
+                if( RSI(_x, 2)[0] < 30){
+                    return true;
+                }
+                else
+                {
+                    return false;
+                }
+            }
+            else if( signal == "Short")
+            {
+                return RSI(_x, 1)[0] > 70;
+            }
+            else
+            {
+                return false;
+            }
+        }
 
 protected override void OnOrderUpdate(Order order, double limitPrice, double stopPrice, int quantity, int filled, double averageFillPrice,
 OrderState orderState, DateTime time, ErrorCode error, string comment)
@@ -848,7 +868,7 @@ OrderState orderState, DateTime time, ErrorCode error, string comment)
             private void CalculateTradeTime()
         {
 
-            if ((ToTime(Time[0]) >= 153000 && ToTime(Time[0]) < 213000))
+            if ((ToTime(Time[0]) >= 153000 && ToTime(Time[0]) < 210000))
             {
                 _canTrade = true;
             }
