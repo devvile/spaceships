@@ -24,7 +24,7 @@ using System.ComponentModel;
 
 namespace NinjaTrader.NinjaScript.Strategies
 {
-    public class Apollo_III : Strategy
+    public class Apollo_III_Sandbox : Strategy
     {
         #region Declarations
         private int LotSize1;
@@ -360,8 +360,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             if (State == State.SetDefaults)
             {
-                Description = @"Sputnik Refacatored";
-                Name = "Apollo III";
+                Description = @"Apollo 3 Sandbox";
+                Name = "Apollo III Sandbox";
                 Calculate = Calculate.OnBarClose;
                 _userLotSize1 = 1;
                 _userLotSize2 = 2;
@@ -600,7 +600,11 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 signalType = "Weak Long";
             }
-
+        /*    else if (conversionLine < baseline && cloud == "Green" && IsAroonUptrend())
+            {
+                signalType = "Weak Long";
+            }
+        */
             else if (conversionLine < baseline && cloud == "Red" && IsAroonDowntrend())
             {
                 signalType = "Strong Short";
@@ -611,11 +615,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                 signalType = "Weak Short";
             }
               
-              else if (conversionLine < baseline && cloud == "Red" && IsAroonUptrend())
+                else if (conversionLine < baseline && cloud == "Red" && IsAroonUptrend())
             {
                 signalType = "Weak Short";
             }
 
+              /*
+            else if (conversionLine > baseline && cloud == "Red" && IsAroonDowntrend())
+            {
+                signalType = "Weak Short";
+            }*/
 
 
             return signalType;

@@ -29,8 +29,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         #region declarations
 
         private Indicator _aroon;
-
         private Indicator _stoch;
+        private Indicator _fastHma;
+        private Indicator _midHma;
+        private Indicator _slowHma;
         private double _aroonUp;
         private int _barsToCheck = 60;
         private double _longStopMargin = 8;
@@ -38,9 +40,11 @@ namespace NinjaTrader.NinjaScript.Strategies
         private bool _canTrade = false;
 
         private bool UseRsi = true;
+
+        private int _hmaSlowPeriod = 100;
+        private int _hmaMidPeriod = 50;
+        private int _hmaFastPeriod = 25;
         #endregion
-
-
 
         #region My Parameters
 
@@ -73,6 +77,40 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private string status = "Flat";
 
+
+        #endregion
+
+        [Display(Name = "Aroon Period", GroupName = "Aroon", Order = 0)]
+        public int AroonPeriod
+        {
+            get { return _aroonPeriod; }
+            set { _aroonPeriod = value; }
+        }
+
+
+
+        #region HMA
+
+        [Display(Name = "HMA Slow", GroupName = "HMA", Order = 0)]
+        public int HmaSlowPeriod
+        {
+            get { return _hmaSlowPeriod; }
+            set { _hmaSlowPeriod = value; }
+        }
+
+        [Display(Name = "HMA Mid ", GroupName = "HMA", Order = 0)]
+        public int HmaMidPeriod
+        {
+            get { return _hmaMidPeriod; }
+            set { _hmaMidPeriod = value; }
+        }
+
+        [Display(Name = "HMA Fast", GroupName = "HMA", Order = 0)]
+        public int HmaFastPeriod
+        {
+            get { return _hmaFastPeriod; }
+            set { _hmaFastPeriod = value; }
+        }
 
         #endregion
 
@@ -174,6 +212,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 RealtimeErrorHandling = RealtimeErrorHandling.IgnoreAllErrors;
                 BarsRequiredToTrade = BarsToCheck;
+                AddDataSeries(BarsPeriodType.Minute, 1);
             }
             else if (State == State.DataLoaded)
             {
@@ -185,7 +224,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         protected override void OnBarUpdate()
         {
-            if (CurrentBar <= BarsRequiredToTrade) return;
+            if (CurrentBar < BarsRequiredToTrade || CurrentBars[0] < BarsRequiredToTrade || CurrentBars[1] < BarsRequiredToTrade)
+                return;
             CalculateTradeTime();
 
             if (Position.MarketPosition == MarketPosition.Flat)
@@ -194,34 +234,56 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             }
 
-            if (Position.MarketPosition == MarketPosition.Flat && stochRsiEntry(RsiEntryLong, "Long") && previousCandleGreen() && _canTrade)
-            {
-                EnterLong(1);
-                SetStopLoss(CalculationMode.Price, calculateStopLong());
-                SetProfitTarget( CalculationMode.Price, calculateStopShort());
+            if (BarsInProgress == 1) {
+                if (Position.MarketPosition == MarketPosition.Flat && stochRsiEntry(RsiEntryLong, "Long") && previousCandleGreen() && _canTrade && Aroonize() && HmaFilter())
+                {
+                    EnterLong(2);
+                    SetStopLoss(CalculationMode.Price, calculateStopLong());
+                    SetProfitTarget(CalculationMode.Price, calculateStopShort());
+                }
+                else if (Position.MarketPosition == MarketPosition.Flat && stochRsiEntry(RsiEntryShort, "Short") && previousCandleRed() && _canTrade && Aroonize() && HmaFilter())
+                {
+                    EnterShort(2);
+                    SetStopLoss(CalculationMode.Price, calculateStopShort());
+                    SetProfitTarget(CalculationMode.Price, calculateStopLong());
+                }
+
             }
-            else if (Position.MarketPosition == MarketPosition.Flat && stochRsiEntry(RsiEntryShort, "Short") &&  previousCandleRed() && _canTrade)
-            {
-                EnterShort(1);
-                SetStopLoss(CalculationMode.Price, calculateStopShort());
-                SetProfitTarget(CalculationMode.Price, calculateStopLong());
-            }
 
+        }
 
+        private bool AroonUp()
+        {
+            return (Aroon(BarsArray[0], AroonPeriod).Up[0] > 70);
+        }
 
+        private bool AroonDown()
+        {
+            return (Aroon(BarsArray[0], AroonPeriod).Down[0] > 70);
+        }
 
+        private bool Aroonize()
+        {
+
+            return (Aroon(BarsArray[0], AroonPeriod).Up[0] < 70 && Aroon(BarsArray[0], AroonPeriod).Down[0] < 70);// && (Aroon(BarsArray[0], AroonPeriod).Up[0] > 10 && Aroon(BarsArray[0], AroonPeriod).Down[0] > 10);
+        }
+
+        private bool HmaFilter()
+        {
+
+            return (_fastHma[0] > _midHma[0] && _midHma[0] < _slowHma[0]) || (_fastHma[0] < _midHma[0] && _midHma[0] > _slowHma[0]) || (_fastHma[0] < _slowHma[0] && _midHma[0] > _slowHma[0]) || (_fastHma[0] < _slowHma[0] && _midHma[0] > _slowHma[0]);
         }
 
 
 
         private bool previousCandleRed()
         {
-            return HeikenAshi8().HAOpen[0] > HeikenAshi8().HAClose[0] && HeikenAshi8().HAOpen[1] < HeikenAshi8().HAClose[1];
+            return HeikenAshi8(BarsArray[1]).HAOpen[0] > HeikenAshi8(BarsArray[1]).HAClose[0] && HeikenAshi8(BarsArray[1]).HAOpen[1] < HeikenAshi8(BarsArray[1]).HAClose[1];
         }
 
         private bool previousCandleGreen()
         {
-            return HeikenAshi8().HAOpen[0] < HeikenAshi8().HAClose[0] && HeikenAshi8().HAOpen[1] > HeikenAshi8().HAClose[1];
+            return HeikenAshi8(BarsArray[1]).HAOpen[0] < HeikenAshi8(BarsArray[1]).HAClose[0] && HeikenAshi8(BarsArray[1]).HAOpen[1] > HeikenAshi8(BarsArray[1]).HAClose[1];
         }
 
         private double calculateStopLong()
@@ -230,7 +292,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             int i = 0; 
             while (i < BarsToCheck) 
             {
-                lows.Add(Low[i]);
+                lows.Add(Lows[1][i]);
 
                 i++; // increment
             }
@@ -246,7 +308,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             int i = 0;
             while (i < BarsToCheck)
             {
-                highs.Add(High[i]);
+                highs.Add(Highs[1][i]);
 
                 i++; // increment
             }
@@ -276,7 +338,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             if (UseRsi)
             {
-               double  _stochFast = StochRSIMod2NT8(StochRsiPeriod, FastMAPeriod, SlowMAPeriod, LookBack).SK[1];
+               double  _stochFast = StochRSIMod2NT8(BarsArray[1],StochRsiPeriod, FastMAPeriod, SlowMAPeriod, LookBack).SK[1];
                 if (positionType == "Long")
                 {
                     return _stochFast <= entryValue;
@@ -298,10 +360,16 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
         private void AddIndicators()
         {
-            _stoch = StochRSIMod2NT8(StochRsiPeriod, FastMAPeriod, SlowMAPeriod, LookBack);
-
-            //    AddChartIndicator(_aroon);
-            //       AddChartIndicator(StochRSIMod2NT8(StochRsiPeriod, FastMAPeriod, SlowMAPeriod, LookBack));
+            _stoch = StochRSIMod2NT8(BarsArray[1],StochRsiPeriod, FastMAPeriod, SlowMAPeriod, LookBack);
+            _aroon = Aroon(BarsArray[0],AroonPeriod);
+            _fastHma = HMA(BarsArray[0],HmaFastPeriod);
+            _midHma = HMA(BarsArray[0],HmaMidPeriod);
+            _slowHma = HMA(BarsArray[0],HmaSlowPeriod);
+            AddChartIndicator(_stoch);
+            AddChartIndicator(_aroon);
+            AddChartIndicator(_fastHma);
+            AddChartIndicator(_midHma);
+            AddChartIndicator(_slowHma);
 
         }
     }
