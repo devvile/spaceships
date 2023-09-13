@@ -378,19 +378,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                         // IGNORE?
                     }
                 }
-                /*
-                if (Position.MarketPosition == MarketPosition.Flat && stochRsiEntry(RsiEntryLong, "Long") && previousCandleGreen() && _canTrade && Aroonize() && HmaFilter())
-                {
-                    EnterLong(2);
-                    SetStopLoss(CalculationMode.Price, calculateStopLong());
-                    SetProfitTarget(CalculationMode.Price, calculateStopShort());
-                }
-                else if (Position.MarketPosition == MarketPosition.Flat && stochRsiEntry(RsiEntryShort, "Short") && previousCandleRed() && _canTrade && Aroonize() && HmaFilter())
-                {
-                    EnterShort(2);
-                    SetStopLoss(CalculationMode.Price, calculateStopShort());
-                    SetProfitTarget(CalculationMode.Price, calculateStopLong());
-                }*/
 
             }
 
@@ -407,9 +394,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private void goShort()
         {
-            _shortOneOrder = EnterShort(LotSize1, "Short1");
-            _shortTwoOrder = EnterShort(LotSize2, "Short2");
-            _shortThreeOrder = EnterShort(LotSize3, "Short3");
+  //         _shortOneOrder = EnterShort(LotSize1, "Short1");
+    //       _shortTwoOrder = EnterShort(LotSize2, "Short2");
+    //        _shortThreeOrder = EnterShort(LotSize3, "Short3");
         }
 
         #endregion

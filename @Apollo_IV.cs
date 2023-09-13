@@ -24,7 +24,7 @@ using System.ComponentModel;
 
 namespace NinjaTrader.NinjaScript.Strategies
 {
-    public class Apollo_III_same_size : Strategy
+    public class Apollo_IV : Strategy
     {
         #region Declarations
         private int LotSize1;
@@ -38,6 +38,9 @@ namespace NinjaTrader.NinjaScript.Strategies
         private Indicator _stoch;
         private Indicator _iczimoku;
         private Indicator _atr;
+        private double acummulated;
+        private double _maxLoss;
+        private double _maxProfit;
 
         Random rnd = new Random();
         private int _aroonPeriod;
@@ -84,6 +87,11 @@ namespace NinjaTrader.NinjaScript.Strategies
         private List<Order> profitTargetOrders;
 
         private int _extraSize;
+        private bool _cutLoss= true;
+        private bool _cutProfit = true;
+
+        private double _dailyProfitLimit = 500;
+        private double _dailyLossLimit = -500;
         #endregion
 
         #region Parameters
@@ -197,14 +205,43 @@ namespace NinjaTrader.NinjaScript.Strategies
             set { _userLotSize3 = value; }
         }
 
-        [Display(Name = "Max Loss Margin", GroupName = "Max Loss Margin", Order = 0)]
+        [Display(Name = "Daily Profit Limit", GroupName = "Position Management", Order = 0)]
+        public double DailyProfitLimit
+        {
+            get { return _dailyProfitLimit; }
+            set { _dailyProfitLimit = value; }
+        }
+
+        [Display(Name = "Daily Loss Limit", GroupName = "Position Management", Order = 0)]
+        public double DailyLossLimit
+        {
+            get { return _dailyLossLimit; }
+            set { _dailyLossLimit = value; }
+        }
+
+        [Display(Name = "Cut Loss", GroupName = "Position Management", Order = 0)]
+        public bool cutLoss
+        {
+            get { return _cutLoss; }
+            set { _cutLoss = value; }
+        }
+
+        [Display(Name = "Cut Profit", GroupName = "Position Management", Order = 0)]
+        public bool cutProfit
+        {
+            get { return _cutProfit; }
+            set { _cutProfit = value; }
+        }
+
+
+
+        [Display(Name = "Emergency stop margin", GroupName = "Position Management", Order = 0)]
         public int MaxLossMargin
         {
             get { return _maxLossMargin; }
             set { _maxLossMargin = value; }
         }
-
-
+  
         #endregion
 
         #region Long
@@ -361,27 +398,27 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (State == State.SetDefaults)
             {
                 Description = @"Sputnik Refacatored";
-                Name = "Apollo III same size";
+                Name = "Apollo IV";
                 Calculate = Calculate.OnBarClose;
                 _userLotSize1 = 1;
                 _userLotSize2 = 2;
-                _userLotSize3 = 1;
+                _userLotSize3 = 2;
                 _profitTargetLong1 = 22;
-                _profitTargetLong2 = 24;
+                _profitTargetLong2 = 26;
                 _profitTargetLong3 = 80;
-                _longStopMargin = 60;
-                _shortStopMargin = 44;
-                _profitTargetShort1 = 20;
+                _longStopMargin = 24;
+                _shortStopMargin = 20;
+                _profitTargetShort1 = 24;
                 _profitTargetShort2 = 24;
-                _profitTargetShort3 = 100;
-                _stochRsiPeriod = 8;
+                _profitTargetShort3 = 90;
+                _stochRsiPeriod = 14;
                 _fastMAPeriod = 3;
                 _slowMAPeriod = 3;
                 _lookBack = 14;
                 _atrPeriod = 10;
-                _atrFilterValue = 3;
-                _maxLossMargin = 60;
-                _barsToCheck = 60;
+                _atrFilterValue = 1.4;
+                _maxLossMargin = 75;
+                _barsToCheck = 80;
 
                 _showHA = true;
                 _useRsi = true;
@@ -393,7 +430,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 _useWeakSignals = true;
                 _useATR = true;
 
-                _aroonPeriod = 25;
+                _aroonPeriod = 100;
                 _rsiEntryLong = 10;
                 _rsiEntryShort = 90;
             }
@@ -423,11 +460,13 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             CalculateTradeTime();
 
-     //       Print("Ariion");
-     //       Print(Aroon(AroonPeriod).Up[0]);
+            //       Print("Ariion");
+            //       Print(Aroon(AroonPeriod).Up[0]);
+
+            ExitOnMaxProfitLoss();
+            
             if (_canTrade)
             {
-                Print(ATR(20)[0]);
                 AdjustStop();
                 TradeLikeAKing();
 
@@ -447,12 +486,27 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         }
 
+        private void Trail()
+        {
+            if (Close[0] > Position.AveragePrice + ((ProfitTargetLong3 * TickSize)*3)/5  && Position.MarketPosition == MarketPosition.Long)
+            {
+                SetStopLoss(CalculationMode.Price, Position.AveragePrice +2.5);
+            }
+            else if (Close[0] < Position.AveragePrice - (((ProfitTargetShort3 * TickSize) * 3) / 5) && Position.MarketPosition == MarketPosition.Short)
+            {
+                SetStopLoss(CalculationMode.Price, Position.AveragePrice-1);
+            }
+        }
+
         private void IchimokuMode()
         {
+
             signal = calculateSignal();
+            Trail();
+  //          ExitOnBars();
             if (signal!="No Singal")
             {
-                if (UseLongs && signal != "Strong Short" && signal != "Weak Short" && noPositions() && previousCandleGreen() && stochRsiEntry(RsiEntryLong, "Long") && applyFilters())
+                if (UseLongs  && signal != "Strong Short" && signal != "Weak Short" && noPositions() && previousCandleGreen() && stochRsiEntry(RsiEntryLong, "Long") && applyFilters())
                 {
                     if(UseStrongSignals && signal =="Strong Long")
                     {
@@ -474,10 +528,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                     {
                         if (makeTrades)
                         {
-         //                   setSmallPositionSizes();
+                            setSmallPositionSizes();
                             _longOneOrder = EnterLong(LotSize1, "Long1");
-                            _longTwoOrder = EnterLong(LotSize2, "Long2");
-                            _longThreeOrder = EnterLong(LotSize2, "Long3");
+                             _longTwoOrder = EnterLong(LotSize2, "Long2");
+        //                    _longThreeOrder = EnterLong(LotSize2, "Long3");
                         }
                         else
                         {
@@ -510,10 +564,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                     {
                         if (makeTrades)
                         {
-             //               setSmallPositionSizes();
+                       setSmallPositionSizes();
                             _shortOneOrder = EnterShort(LotSize1, "Short1");
                             _shortTwoOrder = EnterShort(LotSize2, "Short2");
-                            _shortThreeOrder = EnterShort(LotSize3, "Short3");
+        //                    _shortThreeOrder = EnterShort(LotSize3, "Short3");
                             //                   ShowEntryDetails(signal);
                         }
                         else
@@ -525,6 +579,27 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
             }
         }  
+
+        private void ExitOnMaxProfitLoss()
+        {
+            if (Bars.IsFirstBarOfSession)
+            {
+                acummulated = SystemPerformance.AllTrades.TradesPerformance.Currency.CumProfit;
+            }
+
+            if (SystemPerformance.AllTrades.TradesPerformance.Currency.CumProfit - acummulated > DailyProfitLimit || SystemPerformance.AllTrades.TradesPerformance.Currency.CumProfit - acummulated < DailyLossLimit)
+            {
+                _canTrade = false;
+            }if(Position.MarketPosition != MarketPosition.Flat)
+            {
+                if (cutLoss && SystemPerformance.AllTrades.TradesPerformance.Currency.CumProfit - acummulated + Position.GetUnrealizedProfitLoss(PerformanceUnit.Currency, Close[0]) <= DailyLossLimit || cutProfit && SystemPerformance.AllTrades.TradesPerformance.Currency.CumProfit - acummulated + Position.GetUnrealizedProfitLoss(PerformanceUnit.Currency, Close[0]) >= DailyProfitLimit)
+                {
+                    ExitLong();
+                    ExitShort();
+                    _canTrade = false;
+                }
+            }
+        }
 
         private void AdjustStop()
         {

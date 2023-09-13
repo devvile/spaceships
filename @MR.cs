@@ -235,22 +235,29 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
 
             if (BarsInProgress == 1)
-            {
-                if (Position.MarketPosition == MarketPosition.Flat && stochRsiEntry(RsiEntryLong, "Long") && previousCandleGreen() && _canTrade && Aroonize() && HmaFilter())
+
+            { 
+
+                if (Position.MarketPosition == MarketPosition.Flat && stochRsiEntry(RsiEntryLong, "Long") && previousCandleGreen() && meanReversionConditions())
                 {
                     EnterLong(1);
                     SetStopLoss(CalculationMode.Price, calculateStopLong());
                     SetProfitTarget(CalculationMode.Price, calculateStopShort());
                 }
-                else if (Position.MarketPosition == MarketPosition.Flat && stochRsiEntry(RsiEntryShort, "Short") && previousCandleRed() && _canTrade && Aroonize() && HmaFilter())
+                else if (Position.MarketPosition == MarketPosition.Flat && stochRsiEntry(RsiEntryShort, "Short") && previousCandleRed() && meanReversionConditions())
                 {
-                    EnterShort(1);
-                    SetStopLoss(CalculationMode.Price, calculateStopShort());
-                    SetProfitTarget(CalculationMode.Price, calculateStopLong());
+                   EnterShort(1);
+                   SetStopLoss(CalculationMode.Price, calculateStopShort());
+                   SetProfitTarget(CalculationMode.Price, calculateStopLong());
                 }
 
             }
 
+        }
+
+        private bool meanReversionConditions()
+        {
+            return _canTrade && Aroonize() && HmaFilter();
         }
 
         private bool AroonUp()
