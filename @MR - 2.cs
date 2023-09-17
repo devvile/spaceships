@@ -44,6 +44,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         private bool _canTrade = false;
         private double _longEntryPrice1;
         private double _shortEntryPrice1;
+        private int _shortTarget1;
+        private int _longTarget1;
 
         private bool UseRsi = true;
 
@@ -53,6 +55,14 @@ namespace NinjaTrader.NinjaScript.Strategies
         private int _maxLossMargin = 50;
         private double _atrFilterValue;
         private int _atrPeriod;
+
+        private Order _longOneOrder;
+        private Order _longTwoOrder;
+        private Order _longThreeOrder;
+
+        private Order _shortOneOrder;
+        private Order _shortTwoOrder;
+        private Order _shortThreeOrder;
         #endregion
 
         #region My Parameters
@@ -170,7 +180,14 @@ namespace NinjaTrader.NinjaScript.Strategies
             set { _longTargetMargin = value; }
         }
 
-        [Display(Name = "Stoch Rsi Entry Value", GroupName = "Long", Order = 0)]
+        [Display(Name = "Long1  Fixed Target ", GroupName = "LONGS", Order = 0)]
+        public int LongTarget1
+        {
+            get { return _longTarget1; }
+            set { _longTarget1 = value; }
+        }
+
+        [Display(Name = "Stoch Rsi Entry Value", GroupName = "LONGS", Order = 0)]
         public int RsiEntryLong
         {
             get { return _rsiEntryLong; }
@@ -186,18 +203,25 @@ namespace NinjaTrader.NinjaScript.Strategies
             get { return _shortStopMargin; }
             set { _shortStopMargin = value; }
         }
-        [Display(Name = "Stoch Rsi Entry Value", GroupName = "Short", Order = 0)]
+        [Display(Name = "Stoch Rsi Entry Value", GroupName = "SHORTS", Order = 0)]
         public int RsiEntryShort
         {
             get { return _rsiEntryShort; }
             set { _rsiEntryShort = value; }
         }
 
+
         [Display(Name = "Short Target Margin", GroupName = "SHORTS", Order = 0)]
         public double ShortTargetMargin
         {
             get { return _shortTargetMargin; }
             set { _shortTargetMargin = value; }
+        }
+        [Display(Name = "Short1  Fixed Target ", GroupName = "SHORTS", Order = 0)]
+        public int ShortTarget1
+        {
+            get { return _shortTarget1; }
+            set { _shortTarget1 = value; }
         }
         #endregion
 
@@ -287,15 +311,15 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 if (Position.MarketPosition == MarketPosition.Flat && stochRsiEntry(RsiEntryLong, "Long") && previousCandleGreen() && meanReversionConditions() && _atr[0] >= AtrFilterValue)
                 {
-                    EnterLong(2);
-                    SetStopLoss(CalculationMode.Price, calculateStopLong());
-                    SetProfitTarget(CalculationMode.Price, calculateTargetLong());
+                    _longOneOrder = EnterLong(1, "Long1");
+                    _longTwoOrder = EnterLong(1, "Long2");
+
                 }
                 else if (Position.MarketPosition == MarketPosition.Flat && stochRsiEntry(RsiEntryShort, "Short") && previousCandleRed() && meanReversionConditions() && _atr[0] >= AtrFilterValue)
                 {
-                  EnterShort(2);
-                   SetStopLoss(CalculationMode.Price, calculateStopShort());
-                   SetProfitTarget(CalculationMode.Price, calculateTargetShort());
+                    _shortOneOrder= EnterShort(1, "Short1");
+                    _shortTwoOrder = EnterShort(1, "Short2");
+
                 }
 
             }
@@ -398,9 +422,17 @@ namespace NinjaTrader.NinjaScript.Strategies
             highs.Reverse();
             double highestHigh = highs[0];
 
+            double dynamicStopLoss = highestHigh + ShortStopMargin * TickSize;
+            double maxStopLoss = _shortEntryPrice1 + MaxLossMargin * TickSize;
 
-
-            return highestHigh + ShortStopMargin * TickSize;
+            if (dynamicStopLoss < maxStopLoss)
+            {
+                return dynamicStopLoss;
+            }
+            else
+            {
+                return maxStopLoss;
+            }
         }
 
         private double calculateTargetShort()
@@ -423,7 +455,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private void CalculateTradeTime()
         {
 
-            if ((ToTime(Time[0]) >= 153000 && ToTime(Time[0]) < 204000))
+            if ((ToTime(Time[0]) >= 153000 && ToTime(Time[0]) < 210000))
             {
                 _canTrade = true;
             }
@@ -473,5 +505,118 @@ namespace NinjaTrader.NinjaScript.Strategies
             AddChartIndicator(_slowHma);
 
         }
+
+        private double calculateTargetSmallLong()
+        {
+            double normalTarget = calculateTargetLong();
+            double smallTarget = _longEntryPrice1 + TickSize * LongTarget1;
+
+            if (normalTarget < smallTarget)
+            {
+                return normalTarget;
+            }
+            else
+            {
+              return  smallTarget;
+            }
+        }
+
+        private double calculateTargetSmallShort()
+        {
+            double normalTarget = calculateTargetShort();
+            double smallTarget = _shortEntryPrice1 - TickSize * ShortTarget1;
+
+            if (normalTarget > smallTarget)
+            {
+                return normalTarget;
+            }
+            else
+            {
+                return smallTarget;
+            }
+        }
+        protected override void OnOrderUpdate(Order order, double limitPrice, double stopPrice, int quantity, int filled, double averageFillPrice,
+OrderState orderState, DateTime time, ErrorCode error, string comment)
+        {
+            if (OrderFilled(order) && IsLongOrder1(order))
+            {
+                _longEntryPrice1 = averageFillPrice;
+                SetStopLoss(CalculationMode.Price, calculateStopLong());
+                SetProfitTarget("Long1", CalculationMode.Price, calculateTargetSmallLong());
+
+            }
+            else if (OrderFilled(order) && IsLongOrder2(order))
+            {
+                SetStopLoss(CalculationMode.Price, calculateStopLong());
+                SetProfitTarget("Long2", CalculationMode.Price, calculateTargetLong());
+            }
+            else if (OrderFilled(order) && IsLongOrder3(order))
+            {
+     //           SetProfitTarget("Long3", CalculationMode.Ticks, ProfitTargetLong3);
+            }
+
+            else if (OrderFilled(order) && IsShortOrder1(order))
+            {
+                   _shortEntryPrice1 = averageFillPrice;
+                   SetStopLoss(CalculationMode.Price, calculateStopShort());
+                SetProfitTarget("Short1", CalculationMode.Price, calculateTargetSmallShort());
+            }
+            else if (OrderFilled(order) && IsShortOrder2(order))
+            {
+                SetStopLoss(CalculationMode.Price, calculateStopShort());
+                SetProfitTarget("Short2", CalculationMode.Price, calculateTargetShort());
+            }
+            else if (OrderFilled(order) && IsShortOrder3(order))
+            {
+   //             SetProfitTarget("Short3", CalculationMode.Ticks, ProfitTargetShort3);
+            }
+
+            //   MonitorStopProfit(order, limitPrice, stopPrice);
+            //        MoveStopToBreakeven(order);
+
+        }
+
+        #region Orders Conditions
+
+        private bool IsLongOrder1(Order order)
+        {
+            return order == _longOneOrder;
+        }
+
+        private bool IsLongOrder2(Order order)
+        {
+            return order == _longTwoOrder;
+        }
+
+        private bool IsLongOrder3(Order order)
+        {
+            return order == _longThreeOrder;
+        }
+
+
+        private bool IsShortOrder1(Order order)
+        {
+            return order == _shortOneOrder;
+        }
+
+        private bool IsShortOrder2(Order order)
+        {
+            return order == _shortTwoOrder;
+        }
+
+        private bool IsShortOrder3(Order order)
+        {
+            return order == _shortThreeOrder;
+        }
+
+
+        private bool OrderFilled(Order order)
+        {
+            return order.OrderState == OrderState.Filled;
+        }
+
+        #endregion
     }
+
+
 }
