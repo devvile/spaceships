@@ -33,12 +33,13 @@ namespace NinjaTrader.NinjaScript.Strategies
         private Indicator _slowHMA;
         private Indicator _slowestHMA;
         private Indicator _ha;
+        private Indicator _atr;
 
 
         private int _FastHMAPeriod;
         private int _SlowHMAPeriod;
         private int _SlowestHMAPeriod;
-
+        private int _atrPeriod;
 
         private double _aroonDown;
         private double _aroonUp;
@@ -60,6 +61,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private double _stopLossBaseLong;
         private double _stopLossBaseShort;
+
+        private double _atrFilterValue;
         #endregion
 
         #region My Parameters
@@ -218,6 +221,21 @@ private int BarNr = 0;  //sprawdzic <-----
             get { return _SlowestHMAPeriod; }
             set { _SlowestHMAPeriod = value; }
         }
+
+        [Display(Name = "Atr period", GroupName = "Filters", Order = 0)]
+        public int AtrPeriod
+        {
+            get { return _atrPeriod; }
+            set { _atrPeriod = value; }
+        }
+
+        [Display(Name = "Atr filter value", GroupName = "Filters", Order = 0)]
+        public double AtrFilterValue
+        {
+            get { return _atrFilterValue; }
+            set { _atrFilterValue = value; }
+        }
+
         #endregion
 
 
@@ -269,7 +287,7 @@ private int BarNr = 0;  //sprawdzic <-----
 
             if (Position.MarketPosition == MarketPosition.Long && CrossAbove(_slowHMA, _fastHMA, 1)) 
             {
-                ExitLong("Long1");
+    //            ExitLong("Long1");
             }else if(Position.MarketPosition == MarketPosition.Long && (CrossAbove(Aroon(AroonPeriod).Down, Aroon(AroonPeriod).Up, 1)  || CrossAbove(Aroon(AroonPeriod).Down, Aroon(AroonPeriod).Up, 2)))
             {
                 Mark("Short");
@@ -280,7 +298,7 @@ private int BarNr = 0;  //sprawdzic <-----
 
             if (Position.MarketPosition == MarketPosition.Short && CrossAbove(_fastHMA, _slowHMA, 1))
             {
-                ExitShort("Short1");
+     //           ExitShort("Short1");
             }
             else if (Position.MarketPosition == MarketPosition.Short && (CrossAbove(Aroon(AroonPeriod).Up, Aroon(AroonPeriod).Down, 2) || CrossAbove(Aroon(AroonPeriod).Up, Aroon(AroonPeriod).Down, 1)))
             {
@@ -291,13 +309,13 @@ private int BarNr = 0;  //sprawdzic <-----
 
             // Entry
      
-            if (LongConditions() && UseLongs)
+            if (LongConditions() && UseLongs && _atr[0] >= AtrFilterValue)
             {
                 Mark("Long");
                 _longOneOrder = EnterLong(LotSize1, "Long1");
                 _longTwoOrder = EnterLong(LotSize2, "Long2");
             }
-            if (ShortConditions() && UseShorts)
+            if (ShortConditions() && UseShorts && _atr[0] >= AtrFilterValue)
             {
                 Mark("Short");
                 _shortOneOrder = EnterShort(LotSize1, "Short1");
@@ -476,6 +494,7 @@ OrderState orderState, DateTime time, ErrorCode error, string comment)
 
         private void AddIndicators()
         {
+            _atr = ATR(AtrPeriod);
             if (UseAroon)
             {
                 _aroon = Aroon(AroonPeriod);
