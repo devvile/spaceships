@@ -538,6 +538,18 @@ namespace NinjaTrader.NinjaScript.Strategies
         protected override void OnOrderUpdate(Order order, double limitPrice, double stopPrice, int quantity, int filled, double averageFillPrice,
 OrderState orderState, DateTime time, ErrorCode error, string comment)
         {
+           /* if  (order.Name == "Profit target" && OrderFilled(order) )
+            {
+                double breakEvenPrice = 0;
+                if(Position.MarketPosition == MarketPosition.Long)
+                {
+                    breakEvenPrice = _longEntryPrice1 - LongStopMargin;
+                }else if(Position.MarketPosition == MarketPosition.Short)
+                {
+                    breakEvenPrice = _shortEntryPrice1 + ShortStopMargin;
+                }
+               SetStopLoss(CalculationMode.Price, breakEvenPrice);
+            } */
             if (OrderFilled(order) && IsLongOrder1(order))
             {
                 _longEntryPrice1 = averageFillPrice;
