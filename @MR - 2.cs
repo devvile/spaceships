@@ -55,6 +55,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private int _maxLossMargin = 50;
         private double _atrFilterValue;
         private int _atrPeriod;
+        private int _trailStopTicks;
 
         private Order _longOneOrder;
         private Order _longTwoOrder;
@@ -241,6 +242,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             set { _maxLossMargin = value; }
         }
 
+
         #endregion
 
         #region Filters
@@ -312,13 +314,13 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (Position.MarketPosition == MarketPosition.Flat && stochRsiEntry(RsiEntryLong, "Long") && previousCandleGreen() && meanReversionConditions() && _atr[0] >= AtrFilterValue)
                 {
                     _longOneOrder = EnterLong(1, "Long1");
-                    _longTwoOrder = EnterLong(1, "Long2");
+                   _longTwoOrder = EnterLong(1, "Long2");
 
                 }
                 else if (Position.MarketPosition == MarketPosition.Flat && stochRsiEntry(RsiEntryShort, "Short") && previousCandleRed() && meanReversionConditions() && _atr[0] >= AtrFilterValue)
                 {
                     _shortOneOrder= EnterShort(1, "Short1");
-                    _shortTwoOrder = EnterShort(1, "Short2");
+                 _shortTwoOrder = EnterShort(1, "Short2");
 
                 }
 
@@ -538,18 +540,18 @@ namespace NinjaTrader.NinjaScript.Strategies
         protected override void OnOrderUpdate(Order order, double limitPrice, double stopPrice, int quantity, int filled, double averageFillPrice,
 OrderState orderState, DateTime time, ErrorCode error, string comment)
         {
-           /* if  (order.Name == "Profit target" && OrderFilled(order) )
+            if  (order.Name == "Profit target" && OrderFilled(order) )
             {
-                double breakEvenPrice = 0;
+      /*          double breakEvenPrice = 0;
                 if(Position.MarketPosition == MarketPosition.Long)
                 {
                     breakEvenPrice = _longEntryPrice1 - LongStopMargin;
                 }else if(Position.MarketPosition == MarketPosition.Short)
                 {
                     breakEvenPrice = _shortEntryPrice1 + ShortStopMargin;
-                }
-               SetStopLoss(CalculationMode.Price, breakEvenPrice);
-            } */
+                }*/
+       //        SetTrailStop(CalculationMode.Ticks, 100);
+            } 
             if (OrderFilled(order) && IsLongOrder1(order))
             {
                 _longEntryPrice1 = averageFillPrice;
@@ -559,8 +561,8 @@ OrderState orderState, DateTime time, ErrorCode error, string comment)
             }
             else if (OrderFilled(order) && IsLongOrder2(order))
             {
-                SetStopLoss(CalculationMode.Price, calculateStopLong());
-                SetProfitTarget("Long2", CalculationMode.Price, calculateTargetLong());
+                SetTrailStop("Long2",CalculationMode.Ticks, MaxLossMargin,false);
+       //         SetProfitTarget("Long2", CalculationMode.Price, calculateTargetLong());
             }
             else if (OrderFilled(order) && IsLongOrder3(order))
             {
@@ -575,8 +577,9 @@ OrderState orderState, DateTime time, ErrorCode error, string comment)
             }
             else if (OrderFilled(order) && IsShortOrder2(order))
             {
-                SetStopLoss(CalculationMode.Price, calculateStopShort());
-                SetProfitTarget("Short2", CalculationMode.Price, calculateTargetShort());
+                SetTrailStop("Short2", CalculationMode.Ticks, MaxLossMargin, false);
+                //SetStopLoss(CalculationMode.Price, calculateStopShort());
+                //             SetProfitTarget("Short2", CalculationMode.Price, calculateTargetShort());
             }
             else if (OrderFilled(order) && IsShortOrder3(order))
             {
