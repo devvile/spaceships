@@ -24,10 +24,10 @@ using System.ComponentModel;
 
 namespace NinjaTrader.NinjaScript.Strategies
 {
-    public class MR2 : Strategy
+    public class SojuzIV : Strategy
     {
         #region declarations
-
+        
         private Indicator _aroon;
 
         private Indicator _atr;
@@ -35,19 +35,16 @@ namespace NinjaTrader.NinjaScript.Strategies
         private Indicator _fastHma;
         private Indicator _midHma;
         private Indicator _slowHma;
+        private Indicator _kama;
         private double _aroonUp;
         private int _barsToCheck = 60;
         private double _longStopMargin = 8;
-        private double _longTargetMargin = 8;
-        private double _shortStopMargin = 8;
-        private double _shortTargetMargin = 8;
+
         private bool _canTrade = false;
         private double _longEntryPrice1;
         private double _shortEntryPrice1;
-        private int _shortTarget1;
-        private int _longTarget1;
-
         private bool UseRsi = true;
+
 
         private int _hmaSlowPeriod = 100;
         private int _hmaMidPeriod = 50;
@@ -60,10 +57,17 @@ namespace NinjaTrader.NinjaScript.Strategies
         private Order _longOneOrder;
         private Order _longTwoOrder;
         private Order _longThreeOrder;
+        private int _atrLongRatio = 12;
+        private int _kamaMarginLong = 50;
+        private int _minStopLong = 80;
 
         private Order _shortOneOrder;
         private Order _shortTwoOrder;
         private Order _shortThreeOrder;
+        private int _atrShortRatio = 8;
+        private double _shortStopMargin = 8;
+        private int _kamaMarginShort = 44;
+        private int _minStopShort = 80;
         #endregion
 
         #region My Parameters
@@ -71,7 +75,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private int _entryFastStochValueLong = 19;
         private int _baseStopMarginLong = 8;
         private double _targetRatioLong = 2.0;
-
+        private double acummulated;
         private int _entryFastStochValueShort = 81;
         private int _baseStopMarginShort = 8;
         private double _targetRatioShort = 2.0;
@@ -81,6 +85,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private int _fastMAPeriod = 3;
         private int _slowMAPeriod = 3;
         private int _lookBack = 14;
+
 
         private bool _useLongs = true;
         private bool _useShorts = true;
@@ -95,6 +100,13 @@ namespace NinjaTrader.NinjaScript.Strategies
         private int BarNr = 0;  //sprawdzic <-----
         Random rnd = new Random();
 
+
+        private double _dailyProfitLimit = 500;
+        private double _dailyLossLimit = -500;
+        private bool _cutLoss = true;
+        private bool _cutProfit = true;
+
+
         private string status = "Flat";
 
 
@@ -106,6 +118,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             get { return _aroonPeriod; }
             set { _aroonPeriod = value; }
         }
+
+
 
 
 
@@ -174,19 +188,13 @@ namespace NinjaTrader.NinjaScript.Strategies
             set { _longStopMargin = value; }
         }
 
-        [Display(Name = "Long Target Margin", GroupName = "LONGS", Order = 0)]
-        public double LongTargetMargin
+        [Display(Name = "Atr target1 ratio", GroupName = "LONGS", Order = 0)]
+        public int AtrLongRatio
         {
-            get { return _longTargetMargin; }
-            set { _longTargetMargin = value; }
+            get { return _atrLongRatio; }
+            set { _atrLongRatio = value; }
         }
 
-        [Display(Name = "Long1  Fixed Target ", GroupName = "LONGS", Order = 0)]
-        public int LongTarget1
-        {
-            get { return _longTarget1; }
-            set { _longTarget1 = value; }
-        }
 
         [Display(Name = "Stoch Rsi Entry Value", GroupName = "LONGS", Order = 0)]
         public int RsiEntryLong
@@ -194,9 +202,19 @@ namespace NinjaTrader.NinjaScript.Strategies
             get { return _rsiEntryLong; }
             set { _rsiEntryLong = value; }
         }
+
+
+        [Display(Name = "Min stop", GroupName = "LONGS", Order = 0)]
+        public int MinStopLong
+        {
+            get { return _minStopLong; }
+            set { _minStopLong = value; }
+        }
         #endregion
 
         #region Shorts
+
+
 
         [Display(Name = "Short Stop Margin", GroupName = "SHORTS", Order = 0)]
         public double ShortStopMargin
@@ -204,26 +222,35 @@ namespace NinjaTrader.NinjaScript.Strategies
             get { return _shortStopMargin; }
             set { _shortStopMargin = value; }
         }
+
+        [Display(Name = "Atr target1 ratio", GroupName = "SHORTS", Order = 0)]
+        public int AtrShortRatio
+        {
+            get { return _atrShortRatio; }
+            set { _atrShortRatio = value; }
+        }
+
+        [Display(Name = "KAMA Exit Margin", GroupName = "SHORTS", Order = 0)]
+        public int KamaMarginShort
+        {
+            get { return _kamaMarginShort; }
+            set { _kamaMarginShort = value; }
+        }
+
         [Display(Name = "Stoch Rsi Entry Value", GroupName = "SHORTS", Order = 0)]
         public int RsiEntryShort
         {
             get { return _rsiEntryShort; }
             set { _rsiEntryShort = value; }
         }
+        [Display(Name = "Min stop", GroupName = "SHORTS", Order = 0)]
+        public int MinStopShort
+        {
+            get { return _minStopShort; }
+            set { _minStopShort = value; }
+        }
 
 
-        [Display(Name = "Short Target Margin", GroupName = "SHORTS", Order = 0)]
-        public double ShortTargetMargin
-        {
-            get { return _shortTargetMargin; }
-            set { _shortTargetMargin = value; }
-        }
-        [Display(Name = "Short1  Fixed Target ", GroupName = "SHORTS", Order = 0)]
-        public int ShortTarget1
-        {
-            get { return _shortTarget1; }
-            set { _shortTarget1 = value; }
-        }
         #endregion
 
         #region Position Management
@@ -242,24 +269,51 @@ namespace NinjaTrader.NinjaScript.Strategies
             set { _maxLossMargin = value; }
         }
 
+        [Display(Name = "Daily Profit Limit", GroupName = "Position Management", Order = 0)]
+        public double DailyProfitLimit
+        {
+            get { return _dailyProfitLimit; }
+            set { _dailyProfitLimit = value; }
+        }
 
+        [Display(Name = "Daily Loss Limit", GroupName = "Position Management", Order = 0)]
+        public double DailyLossLimit
+        {
+            get { return _dailyLossLimit; }
+            set { _dailyLossLimit = value; }
+        }
+
+
+        [Display(Name = "Cut Loss", GroupName = "Position Management", Order = 0)]
+        public bool cutLoss
+        {
+            get { return _cutLoss; }
+            set { _cutLoss = value; }
+        }
+
+        [Display(Name = "Cut Profit", GroupName = "Position Management", Order = 0)]
+        public bool cutProfit
+        {
+            get { return _cutProfit; }
+            set { _cutProfit = value; }
+        }
         #endregion
 
         #region Filters
 
         [Display(Name = "Atr period", GroupName = "Filters", Order = 0)]
-            public int AtrPeriod
-            {
-                get { return _atrPeriod; }
-                set { _atrPeriod = value; }
-            }
+        public int AtrPeriod
+        {
+            get { return _atrPeriod; }
+            set { _atrPeriod = value; }
+        }
 
-            [Display(Name = "Atr filter value", GroupName = "Filters", Order = 0)]
-            public double AtrFilterValue
-            {
-                get { return _atrFilterValue; }
-                set { _atrFilterValue = value; }
-            }
+        [Display(Name = "Atr filter value", GroupName = "Filters", Order = 0)]
+        public double AtrFilterValue
+        {
+            get { return _atrFilterValue; }
+            set { _atrFilterValue = value; }
+        }
 
         #endregion
 
@@ -270,7 +324,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (State == State.SetDefaults)
             {
                 Description = @"Sandbox";
-                Name = "MR 2 Mean Reversion";
+                Name = "SOJUZ IV";
                 Calculate = Calculate.OnBarClose;
                 BarsRequiredToTrade = 60;
 
@@ -300,6 +354,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (CurrentBar < BarsRequiredToTrade || CurrentBars[0] < BarsRequiredToTrade || CurrentBars[1] < BarsRequiredToTrade)
                 return;
             CalculateTradeTime();
+            ExitOnMaxProfitLoss();
 
             if (Position.MarketPosition == MarketPosition.Flat)
             {
@@ -309,23 +364,48 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             if (BarsInProgress == 1)
 
-            { 
-
+            {
+                if (status == "Profit1" && KAMA(BarsArray[0], 2, 50, 30)[0] < Close[0] - KamaMarginShort && Position.MarketPosition == MarketPosition.Short)
+                {
+                    ExitShort();
+                }
                 if (Position.MarketPosition == MarketPosition.Flat && stochRsiEntry(RsiEntryLong, "Long") && previousCandleGreen() && meanReversionConditions() && _atr[0] >= AtrFilterValue)
                 {
-                    _longOneOrder = EnterLong(1, "Long1");
-                   _longTwoOrder = EnterLong(1, "Long2");
+                    _longOneOrder = EnterLong(2, "Long1");
+                    _longTwoOrder = EnterLong(1, "Long2");
 
                 }
                 else if (Position.MarketPosition == MarketPosition.Flat && stochRsiEntry(RsiEntryShort, "Short") && previousCandleRed() && meanReversionConditions() && _atr[0] >= AtrFilterValue)
                 {
-                    _shortOneOrder= EnterShort(1, "Short1");
-                 _shortTwoOrder = EnterShort(1, "Short2");
+                    _shortOneOrder = EnterShort(1, "Short1");
+                    _shortTwoOrder = EnterShort(1, "Short2");
 
                 }
 
             }
 
+        }
+
+        private void ExitOnMaxProfitLoss()
+        {
+            if (Bars.IsFirstBarOfSession)
+            {
+                acummulated = SystemPerformance.AllTrades.TradesPerformance.Currency.CumProfit;
+            }
+
+            if (SystemPerformance.AllTrades.TradesPerformance.Currency.CumProfit - acummulated > DailyProfitLimit || SystemPerformance.AllTrades.TradesPerformance.Currency.CumProfit - acummulated < DailyLossLimit)
+            {
+                _canTrade = false;
+            }
+            if (Position.MarketPosition != MarketPosition.Flat)
+            {
+                if (cutLoss && SystemPerformance.AllTrades.TradesPerformance.Currency.CumProfit - acummulated + Position.GetUnrealizedProfitLoss(PerformanceUnit.Currency, Close[0]) <= DailyLossLimit || cutProfit && SystemPerformance.AllTrades.TradesPerformance.Currency.CumProfit - acummulated + Position.GetUnrealizedProfitLoss(PerformanceUnit.Currency, Close[0]) >= DailyProfitLimit)
+                {
+                    ExitLong();
+                    ExitShort();
+                    _canTrade = false;
+                }
+            }
         }
 
         private bool meanReversionConditions()
@@ -382,32 +462,28 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             double dynamicStopLoss = lows[0] - LongStopMargin * TickSize;
             double maxStopLoss = _longEntryPrice1 - MaxLossMargin * TickSize;
+            double minStop = _longEntryPrice1 - MinStopLong * TickSize;
+
+            double smallerStop = 1;
 
             if (dynamicStopLoss < maxStopLoss)
             {
-                return maxStopLoss;
+                smallerStop =  maxStopLoss;
             }
             else
             {
-                return dynamicStopLoss;
+                smallerStop = dynamicStopLoss;
             }
-        }
 
-        private double calculateTargetLong()
-        {
-            List<double> highs = new List<double> { };
-            int i = 0;
-            while (i < BarsToCheck)
+            if(smallerStop > minStop)
             {
-                highs.Add(Highs[1][i]);
-
-                i++; // increment
+                return minStop;
             }
-            highs.Sort();
-            highs.Reverse();
-            double highestHigh = highs[0];
-
-            return highestHigh + LongTargetMargin * TickSize;
+            else
+            {
+               return smallerStop;
+            }
+               
         }
 
         private double calculateStopShort()
@@ -426,32 +502,28 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             double dynamicStopLoss = highestHigh + ShortStopMargin * TickSize;
             double maxStopLoss = _shortEntryPrice1 + MaxLossMargin * TickSize;
+            double minStop = _shortEntryPrice1 + MinStopShort * TickSize;
+            double smallerStop = 1;
 
             if (dynamicStopLoss < maxStopLoss)
             {
-                return dynamicStopLoss;
+               smallerStop =  dynamicStopLoss;
             }
             else
             {
-                return maxStopLoss;
+               smallerStop = maxStopLoss;
             }
-        }
 
-        private double calculateTargetShort()
-        {
-            List<double> lows = new List<double> { };
-            int i = 0;
-            while (i < BarsToCheck)
+            if (smallerStop < minStop)
             {
-                lows.Add(Lows[1][i]);
-
-                i++; // increment
+                return minStop;
             }
-            lows.Sort();
-            //        double highestHigh = highs[0];
-
-            return lows[0] - ShortTargetMargin * TickSize;
+            else
+            {
+                return smallerStop;
+            }
         }
+
 
 
         private void CalculateTradeTime()
@@ -494,7 +566,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
         private void AddIndicators()
         {
-            _atr = ATR(BarsArray[0],AtrPeriod);
+            _atr = ATR(BarsArray[0], AtrPeriod);
             _stoch = StochRSIMod2NT8(BarsArray[1], StochRsiPeriod, FastMAPeriod, SlowMAPeriod, LookBack);
             _aroon = Aroon(BarsArray[0], AroonPeriod);
             _fastHma = HMA(BarsArray[0], HmaFastPeriod);
@@ -505,85 +577,47 @@ namespace NinjaTrader.NinjaScript.Strategies
             AddChartIndicator(_fastHma);
             AddChartIndicator(_midHma);
             AddChartIndicator(_slowHma);
-
         }
 
-        private double calculateTargetSmallLong()
-        {
-            double normalTarget = calculateTargetLong();
-            double smallTarget = _longEntryPrice1 + TickSize * LongTarget1;
 
-            if (normalTarget < smallTarget)
-            {
-                return normalTarget;
-            }
-            else
-            {
-              return  smallTarget;
-            }
-        }
-
-        private double calculateTargetSmallShort()
-        {
-            double normalTarget = calculateTargetShort();
-            double smallTarget = _shortEntryPrice1 - TickSize * ShortTarget1;
-
-            if (normalTarget > smallTarget)
-            {
-                return normalTarget;
-            }
-            else
-            {
-                return smallTarget;
-            }
-        }
         protected override void OnOrderUpdate(Order order, double limitPrice, double stopPrice, int quantity, int filled, double averageFillPrice,
 OrderState orderState, DateTime time, ErrorCode error, string comment)
         {
-            if  (order.Name == "Profit target" && OrderFilled(order) )
+            if (order.Name == "Profit target" && OrderFilled(order))
             {
-      /*          double breakEvenPrice = 0;
-                if(Position.MarketPosition == MarketPosition.Long)
-                {
-                    breakEvenPrice = _longEntryPrice1 - LongStopMargin;
-                }else if(Position.MarketPosition == MarketPosition.Short)
-                {
-                    breakEvenPrice = _shortEntryPrice1 + ShortStopMargin;
-                }*/
-       //        SetTrailStop(CalculationMode.Ticks, 100);
-            } 
+                status = "Profit1";
+            }
             if (OrderFilled(order) && IsLongOrder1(order))
             {
                 _longEntryPrice1 = averageFillPrice;
                 SetStopLoss(CalculationMode.Price, calculateStopLong());
-                SetProfitTarget("Long1", CalculationMode.Price, calculateTargetSmallLong());
+                SetProfitTarget("Long1", CalculationMode.Ticks, _atr[0] * AtrLongRatio);
 
             }
             else if (OrderFilled(order) && IsLongOrder2(order))
             {
-                SetTrailStop("Long2",CalculationMode.Ticks, MaxLossMargin,false);
-       //         SetProfitTarget("Long2", CalculationMode.Price, calculateTargetLong());
+                SetTrailStop("Long2", CalculationMode.Ticks, MaxLossMargin, false);
+
             }
             else if (OrderFilled(order) && IsLongOrder3(order))
             {
-     //           SetProfitTarget("Long3", CalculationMode.Ticks, ProfitTargetLong3);
+
             }
 
             else if (OrderFilled(order) && IsShortOrder1(order))
             {
-                   _shortEntryPrice1 = averageFillPrice;
-                   SetStopLoss(CalculationMode.Price, calculateStopShort());
-                SetProfitTarget("Short1", CalculationMode.Price, calculateTargetSmallShort());
+                _shortEntryPrice1 = averageFillPrice;
+                SetStopLoss(CalculationMode.Price, calculateStopShort());
+                SetProfitTarget("Short1", CalculationMode.Ticks, _atr[0] * AtrShortRatio);
             }
             else if (OrderFilled(order) && IsShortOrder2(order))
             {
-                SetTrailStop("Short2", CalculationMode.Ticks, MaxLossMargin, false);
-                //SetStopLoss(CalculationMode.Price, calculateStopShort());
-                //             SetProfitTarget("Short2", CalculationMode.Price, calculateTargetShort());
+                SetStopLoss(CalculationMode.Price, calculateStopShort());
+
             }
             else if (OrderFilled(order) && IsShortOrder3(order))
             {
-   //             SetProfitTarget("Short3", CalculationMode.Ticks, ProfitTargetShort3);
+                //             SetProfitTarget("Short3", CalculationMode.Ticks, ProfitTargetShort3);
             }
 
             //   MonitorStopProfit(order, limitPrice, stopPrice);
