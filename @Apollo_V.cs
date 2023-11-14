@@ -44,17 +44,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         Random rnd = new Random();
         private int _aroonPeriod;
-        private bool _useAroon;
-        private bool _showHA;
-        private bool _useRsi;
-        private bool _makeTrades;
         private bool _useLongs;
         private bool _useShorts;
-        private bool _useIchimoku;
         private double _stochFast;
-        private bool _useStrongSignals;
-        private bool _useWeakSignals;
-        private bool _useATR;
 
         private int _atrPeriod;
 
@@ -62,9 +54,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private double _longEntryPrice1;
         private double _stopLossBaseLong;
-        private int _profitTargetLong1;
-        private int _profitTargetLong2;
-        private int _profitTargetLong3;
+        private double _profitTargetLong1;
+        private double _profitTargetLong2;
+        private double _profitTargetLong3;
         private Order _longOneOrder;
         private Order _longTwoOrder;
         private Order _longThreeOrder;
@@ -73,12 +65,14 @@ namespace NinjaTrader.NinjaScript.Strategies
         private int _maxLossMargin;
         private double maxLossStop;
         private int _barsToCheck;
+        private int _extraEntryRsiLong;
+        private int _extraEntryRsiShort;
 
         private double _shortEntryPrice1;
         private double _stopLossBaseShort;
-        private int _profitTargetShort1;
-        private int _profitTargetShort2;
-        private int _profitTargetShort3;
+        private double _profitTargetShort1;
+        private double _profitTargetShort2;
+        private double _profitTargetShort3;
         private Order _shortOneOrder;
         private Order _shortTwoOrder;
         private Order _shortThreeOrder;
@@ -89,7 +83,13 @@ namespace NinjaTrader.NinjaScript.Strategies
         private int _extraSize;
         private bool _cutLoss = true;
         private bool _cutProfit = true;
+        private int _trailThresholdShort;
+        private int _trailThresholdShort2;
+        private int _trail2LevelShort;
 
+        private int _trailThresholdLong;
+        private int _trailThresholdLong2;
+        private int _trail2LevelLong;
         private double _dailyProfitLimit = 500;
         private double _dailyLossLimit = -500;
         #endregion
@@ -127,60 +127,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             set { _aroonPeriod = value; }
         }
 
-        [Display(Name = "Show HA", GroupName = "Config", Order = 1)]
-        public bool ShowHA
-        {
-            get { return _showHA; }
-            set { _showHA = value; }
-        }
-
-
-        [Display(Name = "Use Aroon", GroupName = "Config", Order = 3)]
-        public bool UseAroon
-        {
-            get { return _useAroon; }
-            set { _useAroon = value; }
-        }
-
-        [Display(Name = "Use RSI", GroupName = "Config", Order = 2)]
-        public bool UseRsi
-        {
-            get { return _useRsi; }
-            set { _useRsi = value; }
-        }
-
-        [Display(Name = "Trade", GroupName = "Config", Order = 0)]
-        public bool makeTrades
-        {
-            get { return _makeTrades; }
-            set { _makeTrades = value; }
-        }
-
-
         #endregion
 
-        #region Ichimoku
-        [Display(Name = "Use Ichimoku", GroupName = "Ichimoku", Order = 0)]
-        public bool UseIchimoku
-        {
-            get { return _useIchimoku; }
-            set { _useIchimoku = value; }
-        }
-
-        [Display(Name = "Use Strong Signals", GroupName = "Ichimoku", Order = 0)]
-        public bool UseStrongSignals
-        {
-            get { return _useStrongSignals; }
-            set { _useStrongSignals = value; }
-        }
-
-        [Display(Name = "Use Weak Signals", GroupName = "Ichimoku", Order = 0)]
-        public bool UseWeakSignals
-        {
-            get { return _useWeakSignals; }
-            set { _useWeakSignals = value; }
-        }
-        #endregion
 
         #region Position Management
 
@@ -253,41 +201,70 @@ namespace NinjaTrader.NinjaScript.Strategies
             set { _useLongs = value; }
         }
 
-        [Display(Name = "Stoch Rsi Entry Value", GroupName = "Long", Order = 0)]
+        [Display(Name = "Stoch Rsi Entry Value", GroupName = "Long", Order = 1)]
         public int RsiEntryLong
         {
             get { return _rsiEntryLong; }
             set { _rsiEntryLong = value; }
         }
 
-        [Display(Name = "Profit Target 1", GroupName = "Long", Order = 0)]
-        public int ProfitTargetLong1
+        [Display(Name = "Extra Entry Stoch Rsi Long Value", GroupName = "Long", Order = 1)]
+        public int ExtraEntryRsiLong
+        {
+            get { return _extraEntryRsiLong; }
+            set { _extraEntryRsiLong = value; }
+        }
+
+        [Display(Name = "Profit Target 1", GroupName = "Long", Order = 2)]
+        public double ProfitTargetLong1
         {
             get { return _profitTargetLong1; }
             set { _profitTargetLong1 = value; }
         }
 
-        [Display(Name = "Profit Target 2", GroupName = "Long", Order = 0)]
-        public int ProfitTargetLong2
+        [Display(Name = "Profit Target 2", GroupName = "Long", Order = 2)]
+        public double ProfitTargetLong2
         {
             get { return _profitTargetLong2; }
             set { _profitTargetLong2 = value; }
         }
 
         [Range(1, int.MaxValue), NinjaScriptProperty]
-        [Display(Name = "Profit Target 3", GroupName = "Long", Order = 0)]
-        public int ProfitTargetLong3
+        [Display(Name = "Profit Runner Long", GroupName = "Long", Order = 2)]
+        public double ProfitTargetLong3
         {
             get { return _profitTargetLong3; }
             set { _profitTargetLong3 = value; }
         }
 
-        [Display(Name = "Dynamic Stop Margin", GroupName = "Long", Order = 0)]
+        [Display(Name = "Dynamic Stop Margin", GroupName = "Long", Order = 2)]
         public int LongStopMargin
         {
             get { return _longStopMargin; }
             set { _longStopMargin = value; }
         }
+
+        [Display(Name = "Breakeven Trail Threshold", GroupName = "Long", Order = 3)]
+        public int TrailThresholdLong
+        {
+            get { return _trailThresholdLong; }
+            set { _trailThresholdLong = value; }
+        }
+
+        [Display(Name = "Final Trail Threshold", GroupName = "Long", Order = 4)]
+        public int TrailThresholdLong2
+        {
+            get { return _trailThresholdLong2; }
+            set { _trailThresholdLong2 = value; }
+        }
+
+        [Display(Name = "Final Trail Level Long", GroupName = "Long", Order = 5)]
+        public int Trail2LevelLong
+        {
+            get { return _trail2LevelLong; }
+            set { _trail2LevelLong = value; }
+        }
+
 
         #endregion
 
@@ -300,39 +277,68 @@ namespace NinjaTrader.NinjaScript.Strategies
             set { _useShorts = value; }
         }
 
-        [Display(Name = "Stoch Rsi Entry Value", GroupName = "Short", Order = 0)]
+        [Display(Name = "Stoch Rsi Entry Value", GroupName = "Short", Order = 1)]
         public int RsiEntryShort
         {
             get { return _rsiEntryShort; }
             set { _rsiEntryShort = value; }
         }
-        [Display(Name = "Profit Target 1", GroupName = "Short", Order = 0)]
-        public int ProfitTargetShort1
+
+        [Display(Name = "Extra Entry Stoch Rsi Short Value", GroupName = "Short", Order = 1)]
+        public int ExtraEntryRsiShort
+        {
+            get { return _extraEntryRsiShort; }
+            set { _extraEntryRsiShort = value; }
+        }
+
+        [Display(Name = "Profit Target 1", GroupName = "Short", Order = 2)]
+        public double ProfitTargetShort1
         {
             get { return _profitTargetShort1; }
             set { _profitTargetShort1 = value; }
         }
 
-        [Display(Name = "Profit Target 2", GroupName = "Short", Order = 0)]
-        public int ProfitTargetShort2
+        [Display(Name = "Profit Target 2", GroupName = "Short", Order = 2)]
+        public double ProfitTargetShort2
         {
             get { return _profitTargetShort2; }
             set { _profitTargetShort2 = value; }
         }
 
         [Range(1, int.MaxValue), NinjaScriptProperty]
-        [Display(Name = "Profit Target 3", GroupName = "Short", Order = 0)]
-        public int ProfitTargetShort3
+        [Display(Name = "Profit Runner Short ", GroupName = "Short", Order = 2)]
+        public double ProfitTargetShort3
         {
             get { return _profitTargetShort3; }
             set { _profitTargetShort3 = value; }
         }
 
-        [Display(Name = "Dynamic Stop Margin", GroupName = "Short", Order = 0)]
+        [Display(Name = "Dynamic Stop Margin", GroupName = "Short", Order = 2)]
         public int ShortStopMargin
         {
             get { return _shortStopMargin; }
             set { _shortStopMargin = value; }
+        }
+
+        [Display(Name = "Breakeven Trail Threshold", GroupName = "Short", Order = 3)]
+        public int TrailThresholdShort
+        {
+            get { return _trailThresholdShort; }
+            set { _trailThresholdShort = value; }
+        }
+
+        [Display(Name = "Final Trail Threshold", GroupName = "Short", Order = 4)]
+        public int TrailThresholdShort2
+        {
+            get { return _trailThresholdShort2; }
+            set { _trailThresholdShort2 = value; }
+        }
+
+        [Display(Name = "Final Trail Level Short", GroupName = "Short", Order = 5)]
+        public int Trail2LevelShort
+        {
+            get { return _trail2LevelShort; }
+            set { _trail2LevelShort = value; }
         }
 
 
@@ -370,13 +376,6 @@ namespace NinjaTrader.NinjaScript.Strategies
         #endregion
 
         #region Filters
-
-        [Display(Name = "ATR Filter", GroupName = "Filter", Order = 0)]
-        public bool UseATR
-        {
-            get { return _useATR; }
-            set { _useATR = value; }
-        }
 
         [Display(Name = "ATR Period", GroupName = "Filter", Order = 0)]
         public int AtrPeriod
@@ -421,17 +420,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                 _atrFilterValue = 1.4;
                 _maxLossMargin = 75;
                 _barsToCheck = 80;
-
-                _showHA = true;
-                _useRsi = true;
-                _makeTrades = false;
                 _useLongs = true;
                 _useShorts = true;
-                _useIchimoku = true;
-                _useStrongSignals = true;
-                _useWeakSignals = true;
-                _useATR = true;
-
+                _trailThresholdShort = 60;
+                _trailThresholdShort2 = 72;
+                _trailThresholdLong = 60;
+                _trailThresholdLong2 = 70;
                 _aroonPeriod = 100;
                 _rsiEntryLong = 10;
                 _rsiEntryShort = 90;
@@ -463,41 +457,33 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             CalculateTradeTime();
 
-            //       Print("Ariion");
-            //       Print(Aroon(AroonPeriod).Up[0]);
-
-            ExitOnMaxProfitLoss();
 
             if (_canTrade)
             {
+                Trail();
                 AdjustStop();
-                TradeLikeAKing();
-
-            }
-        }
-        private void TradeLikeAKing()
-        {
-            if (UseIchimoku)
-            {
-                //     Print(UseIchimoku);
                 IchimokuMode();
-            }
-            else
-            {
-                NoIchimokuMode();
-            }
 
+            }
         }
 
         private void Trail()
         {
-            if (Close[0] > Position.AveragePrice + ((ProfitTargetLong3 * TickSize) * 3) / 5 && Position.MarketPosition == MarketPosition.Long)
+            if (Close[0] >= Position.AveragePrice + (TrailThresholdLong * TickSize) && Position.MarketPosition == MarketPosition.Long && status!= "Breakeven2 Short" && status != "Breakeven2 Long")
             {
-                SetStopLoss(CalculationMode.Price, Position.AveragePrice + 2.5);
+                status = "Breakeven";
             }
-            else if (Close[0] < Position.AveragePrice - (((ProfitTargetShort3 * TickSize) * 3) / 5) && Position.MarketPosition == MarketPosition.Short)
+            else if (Close[0] <= Position.AveragePrice - (TrailThresholdShort * TickSize) && Position.MarketPosition == MarketPosition.Short && status != "Breakeven2 Short" && status != "Breakeven2 Long")
             {
-                SetStopLoss(CalculationMode.Price, Position.AveragePrice - 1);
+                status = "Breakeven";
+            }
+            else if (Close[0] <= Position.AveragePrice - (TrailThresholdShort2 * TickSize) && Position.MarketPosition == MarketPosition.Short)
+            {
+                status = "Breakeven2 Short";
+            }
+            else if (Close[0] >= Position.AveragePrice + (TrailThresholdLong2 * TickSize) && Position.MarketPosition == MarketPosition.Long)
+            {
+                status = "Breakeven2 Long";
             }
         }
 
@@ -506,85 +492,65 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             signal = calculateSignal();
             Trail();
-            //          ExitOnBars();
-            if (signal != "No Singal")
+
+            if (signal != "No Singal" && applyFilters())
             {
-                if (UseLongs && signal != "Strong Short" && signal != "Weak Short" && noPositions() && previousCandleGreen() && stochRsiEntry(RsiEntryLong, "Long") && applyFilters())
+                if (UseLongs && signal != "Strong Short" && signal != "Weak Short" && noPositions() && previousCandleGreen() && stochRsiEntry(RsiEntryLong, "Long"))
                 {
-                    if (UseStrongSignals && signal == "Strong Long")
+                    if (signal == "Strong Long")
                     {
-                        if (makeTrades)
-                        {
-                            setUserPoisitonSizes();
-                            _longOneOrder = EnterLong(LotSize1, "Long1");
-                            _longTwoOrder = EnterLong(LotSize2, "Long2");
-                            _longThreeOrder = EnterLong(LotSize3, "Long3");
-                            ShowEntryDetails(signal);
-                        }
-                        else
-                        {
-                            ShowEntryDetails(signal);
-                            Mark(signal);
-                        }
+                        setUserPoisitonSizes();
+                        _longOneOrder = EnterLong(LotSize1, "Long1");
+                        _longTwoOrder = EnterLong(LotSize2, "Long2");
+                        _longThreeOrder = EnterLong(LotSize3, "Long3");
+                        ShowEntryDetails(signal);
 
                     }
-                    else if (UseWeakSignals && signal == "Weak Long")
+                    else if (signal == "Weak Long")
                     {
-                        if (makeTrades)
-                        {
-                            setSmallPositionSizes();
-                            _longOneOrder = EnterLong(LotSize1, "Long1");
-                            _longTwoOrder = EnterLong(LotSize2, "Long2");
-                            //                    _longThreeOrder = EnterLong(LotSize2, "Long3");
-                        }
-                        else
-                        {
-                            ShowEntryDetails(signal);
-                            Mark(signal);
-                        }
+                       setSmallPositionSizes();
+                       _longOneOrder = EnterLong(LotSize1, "Long1");
+                       _longTwoOrder = EnterLong(LotSize2, "Long2");
+                        //                    _longThreeOrder = EnterLong(LotSize2, "Long3");
 
                     }
 
                 }
-                else if (UseShorts && signal != "Strong Long" && signal != "Weak Long" && noPositions() && previousCandleRed() && stochRsiEntry(RsiEntryShort, "Short") && applyFilters())
+                else if (UseShorts && signal != "Strong Long" && signal != "Weak Long" && noPositions() && previousCandleRed() && stochRsiEntry(RsiEntryShort, "Short"))
                 {
-                    if (UseStrongSignals && signal == "Strong Short")
+                    if (signal == "Strong Short")
                     {
-                        if (makeTrades)
-                        {
+
                             setUserPoisitonSizes();
                             _shortOneOrder = EnterShort(LotSize1, "Short1");
                             _shortTwoOrder = EnterShort(LotSize2, "Short2");
                             _shortThreeOrder = EnterShort(LotSize3, "Short3");
                             //                     ShowEntryDetails(signal);
-                        }
-                        else
-                        {
-                            ShowEntryDetails(signal);
-                            Mark(signal);
-                        }
                     }
-                    else if (UseWeakSignals && signal == "Weak Short")
+                    else if ( signal == "Weak Short")
                     {
-                        if (makeTrades)
-                        {
+
                             setSmallPositionSizes();
-                            _shortOneOrder = EnterShort(LotSize1, "Short1");
-                            _shortTwoOrder = EnterShort(LotSize2, "Short2");
-                            //                    _shortThreeOrder = EnterShort(LotSize3, "Short3");
+                           _shortOneOrder = EnterShort(LotSize1, "Short1");
+                           _shortTwoOrder = EnterShort(LotSize2, "Short2");
+                            //                   _shortThreeOrder = EnterShort(LotSize3, "Short3");
                             //                   ShowEntryDetails(signal);
-                        }
-                        else
-                        {
-                            ShowEntryDetails(signal);
-                            Mark(signal);
-                        }
+
                     }
                 }
             }
+            if (Position.MarketPosition == MarketPosition.Short && stochRsiExtra( ExtraEntryRsiShort, "Short") && status !="Short Extra" && status != "Breakeven" && status != "Breakeven2 Short")
+            {
+            //    _shortTwoOrder = EnterShort(LotSize2, "Short2");
+            }
+            else if (Position.MarketPosition == MarketPosition.Long && stochRsiExtra(ExtraEntryRsiLong, "Long") && status != "Long Extra"  && status != "Breakeven" && status != "Breakeven2 Long")
+            {
+           //    _longTwoOrder = EnterLong(LotSize2, "Long2");
+            }
         }
 
-        private void ExitOnMaxProfitLoss()
+
+    private void ExitOnMaxProfitLoss()
         {
             if (Bars.IsFirstBarOfSession)
             {
@@ -611,9 +577,13 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (noPositions())
             {
                 status = "Flat";
-                SetStopLoss(CalculationMode.Ticks, 40);
+                SetStopLoss(CalculationMode.Ticks, 50);
             }
             else if (status == "Short Default")
+            {
+                SetStopLoss(CalculationMode.Price, stopLossPrice);
+            }
+            else if (status == "Long Default")
             {
                 SetStopLoss(CalculationMode.Price, stopLossPrice);
             }
@@ -621,9 +591,13 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 SetStopLoss(CalculationMode.Price, Position.AveragePrice);
             }
-            else if (status == "Long Default")
+            else if (status == "Breakeven2 Long")
             {
-                SetStopLoss(CalculationMode.Price, stopLossPrice);
+                SetStopLoss(CalculationMode.Ticks, Trail2LevelLong );
+            }
+            else if (status == "Breakeven2 Short")
+            {
+                SetStopLoss(CalculationMode.Ticks, Trail2LevelShort);
             }
         }
 
@@ -644,9 +618,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private bool applyFilters()
         {
-            if (UseATR)
-            {
-                if (_atr[0] >= AtrFilterValue)
+            if (_atr[0] >= AtrFilterValue)
                 {
                     return true;
                 }
@@ -654,11 +626,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     return false;
                 }
-            }
-            else
-            {
-                return true;
-            }
         }
 
         private string calculateSignal()
@@ -702,19 +669,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             return signalType;
 
-            /*When conversion line above base line and cloud green +Aroon green = strong up trend
-            When conversion line above base line and cloud red+Aroon green = weak up trend
-            When conversion line above base line and cloud green+Aroon red = weak up trend
-            When conversion line below base line and cloud green+Aroon green = weak up trend
-
-            ------------------------------------------------------
-
-            When conversion line below base line and cloud red+Aroon red = strong down trend
-            When conversion line below base line and cloud red+Aroon green = week down trend
-
-            When conversion line below base line and cloud green+Aroon red = week down trend
-
-            When conversion line above base line and cloud red+Aroon red = week down trend */
         }
 
         private string calculateCloud(double recentSpanA, double recentSpanB)
@@ -727,42 +681,6 @@ namespace NinjaTrader.NinjaScript.Strategies
             else
             {
                 return "Red";
-            }
-        }
-
-        private void NoIchimokuMode()
-        {
-            if (UseLongs)
-            {
-                if (LongConditions())
-                {
-                    if (makeTrades)
-                    {
-                        _longOneOrder = EnterLong(LotSize1, "Long1");
-                        _longTwoOrder = EnterLong(LotSize2, "Long2");
-                        _longThreeOrder = EnterLong(LotSize3, "Long3");
-                    }
-                    else
-                    {
-                        Mark("Long");
-                    }
-                }
-            }
-            if (UseShorts)
-            {
-                if (ShortConditions())
-                {
-                    if (makeTrades)
-                    {
-                        _shortOneOrder = EnterShort(LotSize1, "Short1");
-                        _shortTwoOrder = EnterShort(LotSize2, "Short2");
-                        _shortThreeOrder = EnterShort(LotSize3, "Short3");
-                    }
-                    else
-                    {
-                        Mark("Short");
-                    }
-                }
             }
         }
 
@@ -792,78 +710,14 @@ namespace NinjaTrader.NinjaScript.Strategies
             return HeikenAshi8().HAOpen[0] < HeikenAshi8().HAClose[0] && HeikenAshi8().HAOpen[1] > HeikenAshi8().HAClose[1];
         }
 
-        private void Mark(string positionType)
-        {
-            int _nr = rnd.Next();
-            string rando = Convert.ToString(_nr);
-            string name = "tag " + rando;
-            string name2 = "tag2 " + rando;
-            if (positionType == "Short")
-            {
-                Draw.ArrowDown(this, name, true, 0, High[0] + 4 * TickSize, Brushes.Red);
-            }
-            else if (positionType == "Extra Short")
-            {
-                Draw.ArrowDown(this, name, true, 0, High[0] + 4 * TickSize, Brushes.Yellow);
-            }
-            else if (positionType == "Long")
-            {
-                Draw.ArrowUp(this, name, true, 0, Low[0] - 4 * TickSize, Brushes.Blue);
-            }
-            else if (positionType == "Extra Long")
-            {
-                Draw.ArrowUp(this, name, true, 0, Low[0] - 4 * TickSize, Brushes.Yellow);
-            }
-            else if (positionType == "Strong Short")
-            {
-                Draw.ArrowDown(this, name, true, 0, High[0] + TickSize, Brushes.Red);
-                Draw.Text(this, name2, "SS", 0, High[0] + 12);
-            }
-
-            else if (positionType == "Weak Short")
-            {
-                Draw.ArrowDown(this, name, true, 0, High[0] + TickSize, Brushes.Yellow);
-                Draw.Text(this, name2, "WS", 0, High[0] + 12);
-            }
-            else if (positionType == "Strong Long")
-            {
-                Draw.ArrowUp(this, name, true, 0, Low[0] - TickSize, Brushes.Blue);
-                Draw.Text(this, name2, "SLONG", 0, Low[0] - 12 * TickSize);
-            }
-
-            else if (positionType == "Weak Long")
-            {
-                Draw.ArrowUp(this, name, true, 0, Low[0] - TickSize, Brushes.Yellow);
-                Draw.Text(this, name2, "WL", 0, Low[0] - 12 * TickSize);
-            }
-
-        }
-
-
         private bool IsAroonUptrend()
         {
-            if (UseAroon)
-            {
-                return Aroon(AroonPeriod).Up[0] > 70;
-            }
-            else
-            {
-                return true;
-            }
-
+            return Aroon(AroonPeriod).Up[0] > 70;
         }
 
         private bool IsAroonDowntrend()
         {
-            if (UseAroon)
-            {
-                return Aroon(AroonPeriod).Down[0] > 70;
-            }
-            else
-            {
-                return true;
-            }
-
+            return Aroon(AroonPeriod).Down[0] > 70;
         }
 
 
@@ -874,28 +728,37 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private bool stochRsiEntry(int entryValue, string positionType)
         {
-            if (UseRsi)
+            _stochFast = StochRSIMod2NT8(StochRsiPeriod, FastMAPeriod, SlowMAPeriod, LookBack).SK[1];
+            if (positionType == "Long")
             {
-                _stochFast = StochRSIMod2NT8(StochRsiPeriod, FastMAPeriod, SlowMAPeriod, LookBack).SK[1];
-                if (positionType == "Long")
-                {
                     return _stochFast <= entryValue;
-                }
-                else if (positionType == "Short")
-                {
-                    return _stochFast >= entryValue;
-                }
-                else
-                {
-                    return false;
-                }
             }
-            else
+                else if (positionType == "Short")
+            {
+                    return _stochFast >= entryValue;
+            }
+                else
+            {
+                    return false;
+            }
+        }
+
+        private bool stochRsiExtra(int entryValue, string positionType)
+        {
+           double _stochFastPrevious = StochRSIMod2NT8(StochRsiPeriod, FastMAPeriod, SlowMAPeriod, LookBack).SK[1];
+           double _stochFastLast = StochRSIMod2NT8(StochRsiPeriod, FastMAPeriod, SlowMAPeriod, LookBack).SK[0];
+            if (positionType=="Short" && _stochFastPrevious > entryValue && _stochFastLast < entryValue )
             {
                 return true;
             }
-
-        }
+            else if(positionType== "Long" && _stochFastPrevious < entryValue && _stochFastLast > entryValue)
+            {
+                return true;
+            }else
+            {
+                return false;
+            }
+         }
 
         protected override void OnOrderUpdate(Order order, double limitPrice, double stopPrice, int quantity, int filled, double averageFillPrice,
         OrderState orderState, DateTime time, ErrorCode error, string comment)
@@ -910,6 +773,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             else if (OrderFilled(order) && IsLongOrder2(order))
             {
                 SetProfitTarget("Long2", CalculationMode.Ticks, ProfitTargetLong2);
+         //       SetProfitTarget("Long2", CalculationMode.Price, _longEntryPrice1 + ProfitTargetLong1* TickSize);
+         //       status = "Long Extra";
             }
             else if (OrderFilled(order) && IsLongOrder3(order))
             {
@@ -926,6 +791,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             else if (OrderFilled(order) && IsShortOrder2(order))
             {
                 SetProfitTarget("Short2", CalculationMode.Ticks, ProfitTargetShort2);
+         //       SetProfitTarget("Short2", CalculationMode.Price, _shortEntryPrice1 - ProfitTargetShort1 * TickSize);
+            //    status = "Short Extra";
             }
             else if (OrderFilled(order) && IsShortOrder3(order))
             {
@@ -1142,14 +1009,6 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
         }
 
-        private void MoveStopToBreakeven(Order order)
-        {
-            if (order.Name == "Profit target" && order.OrderState == OrderState.Filled)
-            {
-                status = "Breakeven";
-                stopLossPrice = Position.AveragePrice;
-            }
-        }
 
 
         private void addIndicators()
@@ -1158,32 +1017,12 @@ namespace NinjaTrader.NinjaScript.Strategies
             _aroon = Aroon(AroonPeriod);
             _stoch = StochRSIMod2NT8(StochRsiPeriod, FastMAPeriod, SlowMAPeriod, LookBack);
             _iczimoku = ApolloIchimoku(9, 26, 52, 26);
-            if (ShowHA)
-            {
-                AddChartIndicator(_ha);
-            }
-            if (UseRsi)
-            {
-                AddChartIndicator(_stoch);
-            }
-            if (UseAroon)
-            {
-                AddChartIndicator(_aroon);
-            }
-            if (UseIchimoku)
-            {
-                AddChartIndicator(_iczimoku);
-            }
-            if (UseATR)
-            {
-                _atr = ATR(AtrPeriod);
-                AddChartIndicator(_atr);
-            }
-
-
-
-
-            //       AddChartIndicator(IchimokuCloud());
+            AddChartIndicator(_ha);
+            AddChartIndicator(_stoch);
+            AddChartIndicator(_aroon);
+            AddChartIndicator(_iczimoku);
+            _atr = ATR(AtrPeriod);
+            AddChartIndicator(_atr);
         }
     }
 }

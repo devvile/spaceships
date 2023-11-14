@@ -66,6 +66,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private double _profitTargetShort3 = 80;
         private double _extraTargetShort = 60;
         private bool _useAroon = true;
+        private bool _canTrade = false;
         private int _aroonPeriod = 24;
 
 
@@ -379,6 +380,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         protected override void OnBarUpdate()
         {
             if (CurrentBar < BarsRequiredToTrade) return;
+
+            CalculateTradeTime();
 
             if (Position.MarketPosition == MarketPosition.Flat)
             {
@@ -742,6 +745,18 @@ OrderState orderState, DateTime time, ErrorCode error, string comment)
 
         }
 
+        private void CalculateTradeTime()
+        {
+
+            if ((ToTime(Time[0]) >= 153000 && ToTime(Time[0]) < 213000))
+            {
+                _canTrade = true;
+            }
+            else
+            {
+                _canTrade = false;
+            }
+        }
 
         private void AddIndicators()
         {

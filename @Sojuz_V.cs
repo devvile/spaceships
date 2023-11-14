@@ -181,7 +181,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         #endregion
 
         #region Longs
-
+        [Range(1, int.MaxValue), NinjaScriptProperty]
         [Display(Name = "Long Stop Margin", GroupName = "LONGS", Order = 0)]
         public double LongStopMargin
         {
@@ -224,7 +224,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         #region Shorts
 
 
-
+        [Range(1, int.MaxValue), NinjaScriptProperty]
         [Display(Name = "Short Stop Margin", GroupName = "SHORTS", Order = 0)]
         public double ShortStopMargin
         {

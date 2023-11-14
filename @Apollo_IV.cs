@@ -607,7 +607,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (noPositions())
             {
                 status = "Flat";
-                SetStopLoss(CalculationMode.Ticks, 40);
+                SetStopLoss(CalculationMode.Ticks, 52);
             }
             else if(status == "Short Default")
             {

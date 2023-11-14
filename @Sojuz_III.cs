@@ -486,7 +486,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private void CalculateTradeTime()
         {
 
-            if ((ToTime(Time[0]) >= 153000 && ToTime(Time[0]) < 210000))
+            if ((ToTime(Time[0]) >= 153000 && ToTime(Time[0]) < 213000))
             {
                 _canTrade = true;
             }
