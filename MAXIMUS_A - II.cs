@@ -24,16 +24,15 @@ using System.ComponentModel;
 
 namespace NinjaTrader.NinjaScript.Strategies
 {
-    public class Maximus_A : Strategy
+    public class Maximus_AII : Strategy
     {
         #region declarations
 
         private Indicator _aroon;
-
-
         private Order _longOneOrder;
         private Order _shortOneOrder;
         private Indicator _atr;
+        private Indicator _ker;
         private Indicator _stoch;
         private Indicator _aroonSlow;
         private Indicator _aroonMid;
@@ -46,6 +45,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         private bool _canTrade = false;
 
         private bool UseRsi = true;
+        private bool _useShorts = false;
+        private bool _useLongs = false;
         private double _atrTargetRatio;
         private int _atrPeriod = 14;
         #endregion
@@ -66,8 +67,6 @@ namespace NinjaTrader.NinjaScript.Strategies
         private int _slowMAPeriod = 3;
         private int _lookBack = 14;
 
-        private bool _useLongs = true;
-        private bool _useShorts = true;
         private bool _useAroon = true;
         private int _aroonFilter = 40;
         private int _aroonPeriodFast = 24;
@@ -153,7 +152,15 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         #region Longs
 
-        [Display(Name = "Long Stop Margin", GroupName = "LONGS", Order = 0)]
+        [Display(Name = "Use Longs", GroupName = "LONGS", Order = 0)]
+        public bool UseLongs
+        {
+            get { return _useLongs; }
+            set { _useLongs = value; }
+        }
+
+
+        [Display(Name = "Long Stop Margin", GroupName = "LONGS", Order = 1)]
         public double LongStopMargin
         {
             get { return _longStopMargin; }
@@ -161,11 +168,20 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
 
 
+
+
         #endregion
 
         #region Shorts
 
-        [Display(Name = "Short Stop Margin", GroupName = "SHORTS", Order = 0)]
+        [Display(Name = "Use Shorts", GroupName = "SHORTS", Order = 0)]
+        public bool UseShorts
+        {
+            get { return _useShorts; }
+            set { _useShorts = value; }
+        }
+
+        [Display(Name = "Short Stop Margin", GroupName = "SHORTS", Order = 1)]
         public double ShortStopMargin
         {
             get { return _shortStopMargin; }
@@ -212,7 +228,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (State == State.SetDefaults)
             {
                 Description = @"Sandbox";
-                Name = "Maximus A";
+                Name = "Maximus A II (filter)";
                 Calculate = Calculate.OnBarClose;
                 BarsRequiredToTrade = 60;
 
@@ -260,7 +276,22 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (BarsInProgress == 0)
                 {
 
+                    
                     atrValue = _atr[0];
+                    /*
+                    if (_ker[0] >= 0.50)
+                    {
+                        UseLongs = true;
+                    }
+                    else if (_ker[0] <= -0.5)
+                    {
+                        UseShorts = true;
+                    }
+                    else
+                    {
+                        UseLongs = false;
+                        UseShorts = false;
+                    } */
 
                     //Exits
 
@@ -276,8 +307,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 else if (BarsInProgress == 2) // 1 min
                 {
                     //Entries
-                    
-                    if (CrossAbove(Aroon(BarsArray[2], AroonPeriodFast).Down, Aroon(BarsArray[2], AroonPeriodFast).Up, 1) && noPositions() && Aroon(BarsArray[2], AroonPeriodFast).Down[0] > AroonFilter) //&& Aroon(BarsArray[x], AroonPeriodSlow).Down[0]>70)
+
+                    if (CrossAbove(Aroon(BarsArray[2], AroonPeriodFast).Down, Aroon(BarsArray[2], AroonPeriodFast).Up, 1) && noPositions() && Aroon(BarsArray[2], AroonPeriodFast).Down[0] > AroonFilter && UseShorts) //&& Aroon(BarsArray[x], AroonPeriodSlow).Down[0]>70)
                     { 
                         Print("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
                         Print(Time[0]);
@@ -286,7 +317,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         _shortOneOrder = EnterShort(1,"Short1");
                         status = "Short Default";
                     }
-                    else if (CrossAbove(Aroon(BarsArray[2], AroonPeriodFast).Up, Aroon(BarsArray[2], AroonPeriodFast).Down, 1) && noPositions() && Aroon(BarsArray[2], AroonPeriodFast).Up[0] > AroonFilter)// && Aroon(BarsArray[x], AroonPeriodSlow).Up[0] > 70)
+                    else if (CrossAbove(Aroon(BarsArray[2], AroonPeriodFast).Up, Aroon(BarsArray[2], AroonPeriodFast).Down, 1) && noPositions() && Aroon(BarsArray[2], AroonPeriodFast).Up[0] > AroonFilter && UseLongs)// && Aroon(BarsArray[x], AroonPeriodSlow).Up[0] > 70)
                     {
                         Print("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
                         Print(Time[0]);
@@ -493,9 +524,11 @@ OrderState orderState, DateTime time, ErrorCode error, string comment)
         private void AddIndicators()
         {
             _atr = ATR(BarsArray[0],AtrPeriod);
+            _ker = EfficiencyRatioIndicator(BarsArray[0], 5, true);
             _aroonSlow = Aroon(BarsArray[0], AroonPeriodSlow);
             AddChartIndicator(_atr);
             AddChartIndicator(_aroonSlow);
+            AddChartIndicator(_ker);
         }
     }
 }
