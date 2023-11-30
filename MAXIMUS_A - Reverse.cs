@@ -24,7 +24,7 @@ using System.ComponentModel;
 
 namespace NinjaTrader.NinjaScript.Strategies
 {
-    public class Maximus_K_Reverse : Strategy
+    public class Maximus_A_Reverse : Strategy
     {
         #region declarations
 
@@ -221,7 +221,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (State == State.SetDefaults)
             {
                 Description = @"Sandbox";
-                Name = "Maximus K Reverse";
+                Name = "Maximus A Reverse";
                 Calculate = Calculate.OnBarClose;
                 BarsRequiredToTrade = 60;
 
@@ -271,13 +271,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (BarsInProgress == 0) // 1 min 
                 {
 
-
+ 
 
 
                     // Exits
 
-
-                   
                     /* 
                     if (_kama[0] - atrValue * 2 > Close[0] && Position.MarketPosition == MarketPosition.Long)
                     {
@@ -304,7 +302,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     kerValue = _ker[0];
 
 
-                    if (_kama[1] > HeikenAshi8(BarsArray[1]).HAClose[1] && _kama[0]  > HeikenAshi8(BarsArray[1]).HAClose[0] && noPositions() && AroonDown() && kerValue <= 0.5 && RSI(BarsArray[2],14,1)[0] < 70.0) //&& Aroon(BarsArray[x], AroonPeriodSlow).Down[0]>70)
+                    if (_kama[0] > HeikenAshi8(BarsArray[1]).HAClose[1] && _kama[0]  > HeikenAshi8(BarsArray[1]).HAClose[0] && noPositions() && AroonDown() && kerValue <= 0.5) //&& Aroon(BarsArray[x], AroonPeriodSlow).Down[0]>70)
                     {
                         Print("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
                         Print(Close[0]);
@@ -318,7 +316,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         _shortOneOrder = EnterShort(0, 1, "Short1");
                         status = "Short Default";
                     }
-                    else if (_kama[1]  < HeikenAshi8(BarsArray[1]).HAClose[1] && _kama[0]  < HeikenAshi8(BarsArray[1]).HAClose[0] && noPositions() && AroonUp() && kerValue >= 0.5 && RSI(BarsArray[2], 14, 1)[0] > 30)// && Aroon(BarsArray[x], AroonPeriodSlow).Up[0] > 70)
+                    else if (_kama[0]  < HeikenAshi8(BarsArray[1]).HAClose[1] && _kama[0]  < HeikenAshi8(BarsArray[1]).HAClose[0] && noPositions() && AroonUp() && kerValue >= 0.5)// && Aroon(BarsArray[x], AroonPeriodSlow).Up[0] > 70)
                     {
                         Print("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
                         Print("Making Long:");
@@ -332,86 +330,42 @@ namespace NinjaTrader.NinjaScript.Strategies
                     }
 
 
-
-                    //Exit
-                    /*
-
-                    if (Aroon(BarsArray[1], AroonPeriodSlow).Down[0] > 70 && Aroon(BarsArray[1], AroonPeriodSlow).Up[0] < 20)
-                    {
-                        ExitLong(0, 1, "Aroon Exit Long", "Long1");
-                    }
-                    else if (Aroon(BarsArray[1], AroonPeriodSlow).Up[0] > 70 && Aroon(BarsArray[1], AroonPeriodSlow).Down[0] < 20)
-                    {
-                        ExitShort(0, 1, "Aroon Exit Short", "Short1");
-                    }
-
-                    /*
-                   if (_kama[1] < HeikenAshi8(BarsArray[1]).HAClose[1] && _kama[0] + atrValue * 1.5< HeikenAshi8(BarsArray[1]).HAClose[0] && Position.MarketPosition == MarketPosition.Short)
-                   {
-                       ExitShort(0, 1, "Kama Exit Short", "Short1");
-
-                   }
-                   else if (_kama[1] > HeikenAshi8(BarsArray[1]).HAClose[1] && _kama[0] - atrValue *1.5 > HeikenAshi8(BarsArray[1]).HAClose[0] && Position.MarketPosition == MarketPosition.Long)
-                   {
-                       ExitLong(0, 1, "Kama Exit Long", "Long1");
-
-
-                   } 
-                   */
-
-
                 }
                 else if (BarsInProgress == 2) // 16 min
                 {
 
                     atrValue = _atr[0];
+                    //Entries
 
-                    //Exits
-                    
-                   if (Aroon(BarsArray[2], AroonPeriodSlow).Down[0] > 40 && Aroon(BarsArray[2], AroonPeriodSlow).Up[0] < 20)
-                   {
-                       ExitLong(0, 1, "Aroon Exit Long", "Long1");
-                   }else if(Aroon(BarsArray[2], AroonPeriodSlow).Up[0] > 30 && Aroon(BarsArray[2], AroonPeriodSlow).Down[0] < 20)
-                   {
-                       ExitShort(0, 1, "Aroon Exit Short", "Short1");
-                   }
 
-                   if(CrossAbove(Aroon(BarsArray[2], AroonPeriodSlow).Down, Aroon(BarsArray[2], AroonPeriodSlow).Up, 1) && Aroon(BarsArray[2], AroonPeriodSlow).Down[0] >50)
+
+
+                    /*
+
+                    if (CrossAbove(Aroon(BarsArray[x], AroonPeriodSlow).Down, Aroon(BarsArray[x], AroonPeriodSlow).Up, 1) && Position.MarketPosition == MarketPosition.Long)
                     {
+
+                        Print("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
+                        Print(Time[0]);
+                        Print("Closing Long:");
+                        Print("Aroon Down");
+                        Print(Aroon(BarsArray[x], AroonPeriodSlow).Down[0]);
+                        Print("Aroon Up");
+                        Print(Aroon(BarsArray[x], AroonPeriodSlow).Up[0]);
                         ExitLong();
-                    }else if(CrossAbove(Aroon(BarsArray[2], AroonPeriodSlow).Up, Aroon(BarsArray[2], AroonPeriodSlow).Down, 1) && Aroon(BarsArray[2], AroonPeriodSlow).Up[0] > 50)
-                     {
-                        ExitShort();
                     }
-                    
-                   //Entries
+                    else if (CrossAbove(Aroon(BarsArray[x], AroonPeriodSlow).Up, Aroon(BarsArray[x], AroonPeriodSlow).Down, 1) && Position.MarketPosition == MarketPosition.Short)
+                    {
+                        Print("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
+                        Print(Time[0]);
+                        Print("Closing Short:");
+                        Print("Aroon Down");
+                        Print(Aroon(BarsArray[x], AroonPeriodSlow).Down[0]);
+                        Print("Aroon Up");
+                        Print(Aroon(BarsArray[x], AroonPeriodSlow).Up[0]);
+                        ExitShort();
 
-                   /*
-
-                   if (CrossAbove(Aroon(BarsArray[x], AroonPeriodSlow).Down, Aroon(BarsArray[x], AroonPeriodSlow).Up, 1) && Position.MarketPosition == MarketPosition.Long)
-                   {
-
-                       Print("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
-                       Print(Time[0]);
-                       Print("Closing Long:");
-                       Print("Aroon Down");
-                       Print(Aroon(BarsArray[x], AroonPeriodSlow).Down[0]);
-                       Print("Aroon Up");
-                       Print(Aroon(BarsArray[x], AroonPeriodSlow).Up[0]);
-                       ExitLong();
-                   }
-                   else if (CrossAbove(Aroon(BarsArray[x], AroonPeriodSlow).Up, Aroon(BarsArray[x], AroonPeriodSlow).Down, 1) && Position.MarketPosition == MarketPosition.Short)
-                   {
-                       Print("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
-                       Print(Time[0]);
-                       Print("Closing Short:");
-                       Print("Aroon Down");
-                       Print(Aroon(BarsArray[x], AroonPeriodSlow).Down[0]);
-                       Print("Aroon Up");
-                       Print(Aroon(BarsArray[x], AroonPeriodSlow).Up[0]);
-                       ExitShort();
-
-                   }*/
+                    }*/
                 }
             }
 
@@ -621,7 +575,6 @@ OrderState orderState, DateTime time, ErrorCode error, string comment)
       //      AddChartIndicator(_atr);
             AddChartIndicator(_aroonSlow);
             AddChartIndicator(_kama);
-            AddChartIndicator(HeikenAshi8(BarsArray[1]));
      //       AddChartIndicator(_ker);
         }
     }
