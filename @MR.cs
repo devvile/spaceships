@@ -24,7 +24,7 @@ using System.ComponentModel;
 
 namespace NinjaTrader.NinjaScript.Strategies
 {
-    public class Mr : Strategy
+    public class MrS : Strategy
     {
         #region declarations
 
@@ -218,7 +218,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (State == State.SetDefaults)
             {
                 Description = @"Sandbox";
-                Name = "MR";
+                Name = "MR S";
                 Calculate = Calculate.OnBarClose;
                 BarsRequiredToTrade = 60;
 
