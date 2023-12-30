@@ -25,58 +25,61 @@ using NinjaTrader.NinjaScript.DrawingTools;
 //This namespace holds Strategies in this folder and is required. Do not change it. 
 namespace NinjaTrader.NinjaScript.Strategies
 {
-	public class RsiTest : Strategy
-	{
-		#region declarations
-		int _rsiPeriod = 14;
-		private Indicator _rsi;
+    public class RsiTest : Strategy
+    {
+        #region declarations
+        int _rsiPeriod = 14;
+        private Indicator _rsi;
         private bool _canTrade;
 
+
         #region Levels Declarations
-            double todayGlobexLow;
-            double todayGlobexHigh;
-            double yesterdayGlobexLow;
-            double yesterdayGlobexHigh;
-            int globexStartTime;
-            double todayRTHLow;
-            double todayRTHHigh;
-            double yesterdayRTHLow;
-            double yesterdayRTHHigh;
-            int rthStartTime = 153000;
-            int rthEndTime = 220000;
-            double lastWeekHigh;
-            double lastWeekLow;
-            double thisWeekHigh;
-            double thisWeekLow;
-            double IBLow;
-            double IBHigh;
-            int IbEndTime;
-            double[] keyLevels = {};
+        double todayGlobexLow;
+        double todayGlobexHigh;
+        double yesterdayGlobexLow;
+        double yesterdayGlobexHigh;
+        int globexStartTime;
+        double todayRTHLow;
+        double todayRTHHigh;
+        double yesterdayRTHLow;
+        double yesterdayRTHHigh;
+        int rthStartTime = 153000;
+        int rthEndTime = 220000;
+        double lastWeekHigh;
+        double lastWeekLow;
+        double thisWeekHigh;
+        double thisWeekLow;
+        double IBLow;
+        double IBHigh;
+        int IbEndTime;
+        PriceLevel[] keyLevels = { };
+
+
         #endregion
 
         #endregion
 
         protected override void OnStateChange()
-		{
-			if (State == State.SetDefaults)
-			{
-				Description									= @"RSI TEST STraaaaa!";
-				Name										= "RSI TEST STARATEGY";
-				Calculate									= Calculate.OnBarClose;
-				EntriesPerDirection							= 1;
-				EntryHandling								= EntryHandling.AllEntries;
-				IsExitOnSessionCloseStrategy				= true;
-				ExitOnSessionCloseSeconds					= 5;
-				IsFillLimitOnTouch							= false;
-				MaximumBarsLookBack							= MaximumBarsLookBack.TwoHundredFiftySix;
-				OrderFillResolution							= OrderFillResolution.Standard;
-				Slippage									= 0.8;
-				StartBehavior								= StartBehavior.WaitUntilFlat;
-				TimeInForce									= TimeInForce.Gtc;
-				TraceOrders									= false;
-				RealtimeErrorHandling						= RealtimeErrorHandling.StopCancelClose;
-				StopTargetHandling							= StopTargetHandling.PerEntryExecution;
-				BarsRequiredToTrade							= 20;
+        {
+            if (State == State.SetDefaults)
+            {
+                Description = @"RSI TEST STraaaaa!";
+                Name = "RSI TEST STARATEGY";
+                Calculate = Calculate.OnBarClose;
+                EntriesPerDirection = 1;
+                EntryHandling = EntryHandling.AllEntries;
+                IsExitOnSessionCloseStrategy = true;
+                ExitOnSessionCloseSeconds = 5;
+                IsFillLimitOnTouch = false;
+                MaximumBarsLookBack = MaximumBarsLookBack.TwoHundredFiftySix;
+                OrderFillResolution = OrderFillResolution.Standard;
+                Slippage = 0.8;
+                StartBehavior = StartBehavior.WaitUntilFlat;
+                TimeInForce = TimeInForce.Gtc;
+                TraceOrders = false;
+                RealtimeErrorHandling = RealtimeErrorHandling.StopCancelClose;
+                StopTargetHandling = StopTargetHandling.PerEntryExecution;
+                BarsRequiredToTrade = 20;
 
                 //LEVELS Detection
 
@@ -101,11 +104,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                 IbEndTime = 163000;
 
 
-                IsInstantiatedOnEachOptimizationIteration	= true;
-			}
-			else if (State == State.Configure)
-			{
-                SetStopLoss(CalculationMode.Ticks, 2-0);
+                IsInstantiatedOnEachOptimizationIteration = true;
+            }
+            else if (State == State.Configure)
+            {
+                SetStopLoss(CalculationMode.Ticks, 100);
                 //     SetProfitTarget(CalculationMode.Ticks, 200);
                 AddDataSeries(BarsPeriodType.Minute, 1);
                 AddDataSeries(BarsPeriodType.Week, 1);
@@ -117,89 +120,65 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
         }
 
-		protected override void OnBarUpdate()
-		{
-			if (CurrentBars[0] < BarsRequiredToTrade && CurrentBars[1] < BarsRequiredToTrade && CurrentBars[2] < 1)
-				return;
+        protected override void OnBarUpdate()
+        {
+            if (CurrentBars[0] < BarsRequiredToTrade && CurrentBars[1] < BarsRequiredToTrade && CurrentBars[2] < 1)
+                return;
+
 
             CalculateTradeTime();
             CalculateLevels();
-            ShowLevels();
+            Print(keyLevels.Length);
 
-            if(Position.MarketPosition != MarketPosition.Flat && ToTime(Time[0]) >= rthEndTime)
+
+            if (Position.MarketPosition != MarketPosition.Flat && ToTime(Time[0]) >= rthEndTime)
             {
                 ExitLong();
                 ExitShort();
             }
 
-            if (_canTrade && BarsInProgress == 0) 
-			{
-				if (_rsi[0] < 30 && Position.MarketPosition == MarketPosition.Flat)
-				{
+            if (_canTrade && BarsInProgress == 0)
+            {
+                if (_rsi[0] < 30 && Position.MarketPosition == MarketPosition.Flat)
+                {
                     EnterLong();
-					Print("Entering Long:");
-				//	Showinfo();
+                    Print("Entering Long:");
+                    //	Showinfo();
                 }
-				else if (_rsi[0] > 80 && Position.MarketPosition == MarketPosition.Flat)
-				{
+                else if (_rsi[0] > 80 && Position.MarketPosition == MarketPosition.Flat)
+                {
                     EnterShort();
                     Print("Entering Short:");
-              //      Showinfo();
+                    //      Showinfo();
                 }
 
-				if (_rsi[0] < 30 && Position.MarketPosition == MarketPosition.Short)
-				{
-					ExitShort();
-				}
-				else if (_rsi[0] > 80 && Position.MarketPosition == MarketPosition.Long)
-				{
-					ExitLong();
-				}
-			}
-			//Add your custom strategy logic here.
-		}
-
-		private void AddIndicators()
-		{
-			_rsi = RSI(rsiPeriod,1);
-           AddChartIndicator(_rsi);
+                if (_rsi[0] < 30 && Position.MarketPosition == MarketPosition.Short)
+                {
+                    ExitShort();
+                }
+                else if (_rsi[0] > 80 && Position.MarketPosition == MarketPosition.Long)
+                {
+                    ExitLong();
+                }
+            }
+            //Add your custom strategy logic here.
         }
 
-		private void ShowLevels()
-		{
-			Print("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
-			Print(Time[0]);
-            Print("Vwapx");
-            Print(VWAP(BarsArray[0]).PlotVWAP[0]);
-            Print("Today Globex High:");
-            Print(todayGlobexHigh);
-            Print("Today Globex Low:");
-            Print(todayGlobexLow);
-            Print("Yesterday Globex High:");
-            Print(yesterdayGlobexHigh);
-            Print("Yesterday Globex Low:");
-            Print(yesterdayGlobexLow);
-            Print("Today RTH High:");
-            Print(todayRTHHigh);
-            Print("Today RTH Low:");
-            Print(todayRTHLow);
-            Print("Yesterday RTH High:");
-            Print(yesterdayRTHHigh);
-            Print("Yesterday RTH Low:");
-            Print(yesterdayRTHLow);
-            Print("IB High:");
-            Print(IBHigh);
-            Print("IB Low:");
-            Print(IBLow);
-            Print("This Week High:");
-            Print(thisWeekHigh);
-            Print("This Week Low:");
-            Print(thisWeekLow);
-            Print("Last Week High:");
-            Print(lastWeekHigh);
-            Print("Last Week Low:");
-            Print(lastWeekLow);
-            Print(keyLevels[13]);
+        private void AddIndicators()
+        {
+            _rsi = RSI(BarsArray[0],rsiPeriod, 1);
+            AddChartIndicator(_rsi);
+        }
+
+        private void ShowLevels(PriceLevel[] keyLevels)
+        {
+            foreach (PriceLevel element in keyLevels)
+            {
+                Print("xxxxxxxxxxxxx");
+                Print(element.Name);
+                Print(element.Price);
+                Print("xxxxxxxxxxxxx");
+            }
         }
 
         private void CalculateTradeTime()
@@ -218,6 +197,13 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private void CalculateLevels()
         {
+                       //     Print("Calculating Key Levels...");
+    
+
+
+                            //Calculating Levels aand assingment to  keyLevels array;
+
+            #region Levels calculation
 
             if (Bars.IsFirstBarOfSession && BarsInProgress == 1)
             {
@@ -231,10 +217,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
 
             }
-            
+
             if (BarsInProgress == 1)
             {
-                
+
                 if (High[0] > thisWeekHigh)
                 {
                     thisWeekHigh = High[0];
@@ -244,7 +230,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     thisWeekLow = Low[0];
                 };
-                
+
                 if (ToTime(Time[0]) == globexStartTime)
                 {
                     yesterdayGlobexLow = todayGlobexLow;
@@ -289,7 +275,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }  // Today RTH high/low
 
 
-                if (isIB(ToTime(Time[0]))) 
+                if (isIB(ToTime(Time[0])))
                 {
                     if (High[0] > IBHigh)
                     {
@@ -309,48 +295,121 @@ namespace NinjaTrader.NinjaScript.Strategies
                 thisWeekHigh = Highs[2][0];
                 thisWeekLow = Lows[2][0];
             }
-             keyLevels = new double[]{ todayGlobexHigh, todayGlobexLow, yesterdayGlobexHigh, yesterdayGlobexLow, todayRTHHigh, todayRTHLow, yesterdayRTHHigh, yesterdayRTHLow, IBHigh, IBLow, thisWeekHigh, thisWeekLow, lastWeekHigh, lastWeekLow, VWAP(BarsArray[1]).PlotVWAP[0] };
+            #endregion
 
+            PriceLevel[] keyLevelsFilled = new PriceLevel[]
+            {
+              new PriceLevel("Today Globex High", todayGlobexHigh,0,false),
+              new PriceLevel("Today Globex Low", todayGlobexLow,0,false),
+              new PriceLevel("Yesterday Globex High", yesterdayGlobexHigh,0,false),
+              new PriceLevel("Yesterday Globex Low", yesterdayGlobexLow,0,false),
+              new PriceLevel("Today RTH High", todayRTHHigh,0,false),
+              new PriceLevel("Today RTH Low", todayRTHLow,0,false),
+              new PriceLevel("Yesterdat RTH High", yesterdayRTHHigh,0,false),
+              new PriceLevel("YesterDay RTH Low", yesterdayRTHLow,0,false),
+              new PriceLevel("IB High", IBHigh,0,false),
+              new PriceLevel("IB Low", IBLow,0,false),
+              new PriceLevel("Last Week High", lastWeekHigh,0,false),
+              new PriceLevel("Last Week Low", lastWeekLow,0,false),
+              new PriceLevel("This Week High", thisWeekHigh,0,false),
+              new PriceLevel("This Week Low", thisWeekLow,0,false),
+              new PriceLevel("VWAP", VWAP(BarsArray[1]).PlotVWAP[0],0,false)
+            };
+
+            keyLevels = keyLevelsFilled;
         }
 
         #region LevelsTimeFunctions
-            private bool isGlobex(int time)
+        private bool isGlobex(int time)
+        {
+            if (time >= globexStartTime && time <= rthStartTime)
             {
-                if (time >= globexStartTime && time <= rthStartTime)
-                {
-                    return true;
-                }
-                else
-                {
-                    return false;
-                }
+                return true;
             }
-
-            private bool isRTH(int time)
+            else
             {
-                if (time >= rthStartTime && time <= rthEndTime)
-                {
-                    return true;
-                }
-                else
-                {
-                    return false;
-                }
+                return false;
             }
+        }
 
-
-            private bool isIB(int time)
+        private bool isRTH(int time)
+        {
+            if (time >= rthStartTime && time <= rthEndTime)
             {
-                if (time >= rthStartTime && time <= IbEndTime)
-                {
-                    return true;
-                }
-                else
-                {
-                    return false;
-                }
+                return true;
             }
+            else
+            {
+                return false;
+            }
+        }
+
+
+        private bool isIB(int time)
+        {
+            if (time >= rthStartTime && time <= IbEndTime)
+            {
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+        }
         #endregion
+
+        private bool previousCandleRed()
+        {
+            return HeikenAshi8().HAOpen[0] > HeikenAshi8().HAClose[0] && HeikenAshi8().HAOpen[1] < HeikenAshi8().HAClose[1];
+        }
+
+        private bool previousCandleGreen()
+        {
+            return HeikenAshi8().HAOpen[0] < HeikenAshi8().HAClose[0] && HeikenAshi8().HAOpen[1] > HeikenAshi8().HAClose[1];
+        }
+
+        public class PriceLevel
+        {
+
+            public string Name { get; set; }
+            public double Price { get; set; }
+            public double Diff { get; set; }
+            public bool InRange { get; set; }
+            public PriceLevel(string name, double price, double difference, bool isInRange)
+            {
+                Name = name;
+                Price = price;
+                Diff = difference;
+                InRange = isInRange;
+            }
+        }
+
+
+        public class LevelsApp{
+            PriceLevel[] PriceLevels = new PriceLevel[]{ };
+
+            private RsiTest parent;
+            public LevelsApp( RsiTest instance)
+            {
+                parent = instance;
+            }
+
+           
+
+            public void MyMethod()
+            {
+            //    parent.Print("I just got executed!");
+            }
+
+            public void setDupa()
+            {
+              //  parent.dupa = 5;
+            }
+
+        }
+        
+
+        // PARAMETERES DEFINITION
 
         #region Config
 
