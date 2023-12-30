@@ -53,7 +53,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         double IBHigh;
         int IbEndTime;
         PriceLevel[] keyLevels = { };
-
+        PriceLevel[] keyLevelsInDistanceLong = { };
+        PriceLevel[] keyLevelsInDistanceShort = { };
 
         #endregion
 
@@ -126,9 +127,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
 
 
-            CalculateTradeTime();
-            CalculateLevels();
-            Print(keyLevels.Length);
+            CalculateTradeTime();   //enabling trading in strictly declared hours
+            CalculateLevels();    // calculation of price-hour levels
+            CalculateLevelsDistance(); // calculation of distance from price to levels
 
 
             if (Position.MarketPosition != MarketPosition.Flat && ToTime(Time[0]) >= rthEndTime)
@@ -358,15 +359,41 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
         #endregion
 
-        private bool previousCandleRed()
+        private void CalculateLevelsDistance()
         {
-            return HeikenAshi8().HAOpen[0] > HeikenAshi8().HAClose[0] && HeikenAshi8().HAOpen[1] < HeikenAshi8().HAClose[1];
+
         }
 
-        private bool previousCandleGreen()
+        static void checkIfPriceInRange(PriceLevel[] arr, double currentPrice, double targetPrice)
         {
-            return HeikenAshi8().HAOpen[0] < HeikenAshi8().HAClose[0] && HeikenAshi8().HAOpen[1] > HeikenAshi8().HAClose[1];
+            //Zadaniem tej funkcji jest wypuszczenie Arraya z cenami w zasiegu dla Longa oraz dla Shorta ( jako oddzielne arraye w obi3ekcie globalnym);
+           
+
+            // musimy wziac obecna cene i sprawdzic 
+            /*
+            double closestLevel = 0;
+            double smallestDifference = 9999;
+            double diff = 0;
+            foreach (double levelPrice in arr)
+            {
+                Console.WriteLine("Now processing:");
+                Console.WriteLine(levelPrice);
+                diff = Math.Abs(levelPrice - entryPrice);
+                if (diff < smallestDifference)
+                {
+                    smallestDifference = diff;
+                    closestLevel = levelPrice;
+                }
+            }
+            Console.WriteLine("xxxxxxxxxxxxxxxxxxx");
+            Console.WriteLine("Closest price:");
+            Console.WriteLine(closestLevel);
+            Console.WriteLine("Price Difference:");
+            Console.WriteLine(diff);
+            return arr[0]; */
         }
+
+
 
         public class PriceLevel
         {
