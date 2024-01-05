@@ -25,12 +25,36 @@ using NinjaTrader.NinjaScript.DrawingTools;
 //This namespace holds Strategies in this folder and is required. Do not change it. 
 namespace NinjaTrader.NinjaScript.Strategies
 {
-    public class RsiTest : Strategy
+    public class Apollonio : Strategy
     {
         #region declarations
+
         int _rsiPeriod = 14;
         private Indicator _rsi;
         private bool _canTrade;
+        private int _tradingTimeStart;
+        private int _tradingTimeEnd;
+
+        #region Indicators
+        private Indicator _aroon;
+        private Indicator _stoch;
+        private Indicator _ha;
+        private Indicator _atr;
+        private Indicator _Vix;
+        private Indicator _iczimoku;
+
+        private int _atrPeriod;
+        private int _aroonPeriod;
+        private int _stochRsiPeriod;
+        #endregion
+
+        #region Position Management Declarations
+
+        private int _weakEntrySize;
+        private int _strongEntrySize;
+        private int _runnerSize;
+
+        #endregion
 
 
         #region Levels Declarations
@@ -44,7 +68,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         double yesterdayRTHLow;
         double yesterdayRTHHigh;
         int rthStartTime = 153000;
-        int rthEndTime = 220000;
+        int rthEndTime = 215900;
         double lastWeekHigh;
         double lastWeekLow;
         double thisWeekHigh;
@@ -64,8 +88,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             if (State == State.SetDefaults)
             {
-                Description = @"RSI TEST STraaaaa!";
-                Name = "RSI TEST STARATEGY";
+                Description = @"Apollo IX!";
+                Name = "huwdu";
                 Calculate = Calculate.OnBarClose;
                 EntriesPerDirection = 1;
                 EntryHandling = EntryHandling.AllEntries;
@@ -81,9 +105,25 @@ namespace NinjaTrader.NinjaScript.Strategies
                 RealtimeErrorHandling = RealtimeErrorHandling.StopCancelClose;
                 StopTargetHandling = StopTargetHandling.PerEntryExecution;
                 BarsRequiredToTrade = 20;
+                _tradingTimeStart = 153000;
+                _tradingTimeEnd = 214000;
 
+                //filters
+                _aroonPeriod = 5;
+                _atrPeriod = 12;
+                _stochRsiPeriod = 14;
                 //LEVELS Detection
 
+                #region Position Management defaults
+
+                _weakEntrySize = 2;
+                _strongEntrySize = 4;
+                _runnerSize = 1;
+
+        #endregion
+
+
+        #region Level Detection defaults
                 todayGlobexLow = 0;
                 todayGlobexHigh = 0;
                 yesterdayGlobexLow = 0;
@@ -103,42 +143,46 @@ namespace NinjaTrader.NinjaScript.Strategies
                 IBLow = 0;
                 IBHigh = 0;
                 IbEndTime = 163000;
+                #endregion
+
 
 
                 IsInstantiatedOnEachOptimizationIteration = true;
             }
             else if (State == State.Configure)
             {
-                SetStopLoss(CalculationMode.Ticks, 100);
-                //     SetProfitTarget(CalculationMode.Ticks, 200);
+
                 AddDataSeries(BarsPeriodType.Minute, 1);
+                AddDataSeries(BarsPeriodType.Minute, 4);
+                AddDataSeries(BarsPeriodType.Minute, 16);
+                AddDataSeries(BarsPeriodType.Day, 1);
                 AddDataSeries(BarsPeriodType.Week, 1);
             }
             else if (State == State.DataLoaded)
             {
                 ClearOutputWindow();
-                AddIndicators();
+            //    AddIndicators();
             }
         }
 
         protected override void OnBarUpdate()
         {
-            if (CurrentBars[0] < BarsRequiredToTrade && CurrentBars[1] < BarsRequiredToTrade && CurrentBars[2] < 1)
+            if (CurrentBars[0] < BarsRequiredToTrade && CurrentBars[1] < BarsRequiredToTrade || CurrentBars[2] < BarsRequiredToTrade && CurrentBars[3] < BarsRequiredToTrade || CurrentBars[4] < 10 || CurrentBars[5] < 1)
                 return;
 
 
             CalculateTradeTime();   //enabling trading in strictly declared hours
-            CalculateLevels();    // calculation of price-hour levels
-            CalculateLevelsDistance(); // calculation of distance from price to levels
+      //      CalculateLevels();    // calculation of price-hour levels
+      //      CalculateLevelsDistance(); // calculation of distance from price to levels
 
 
-            if (Position.MarketPosition != MarketPosition.Flat && ToTime(Time[0]) >= rthEndTime)
+         /*   if (Position.MarketPosition != MarketPosition.Flat && ToTime(Time[0]) >= rthEndTime)
             {
                 ExitLong();
                 ExitShort();
-            }
+            }*/
 
-            if (_canTrade && BarsInProgress == 0)
+            if (_canTrade && BarsInProgress == 1)
             {
                 if (_rsi[0] < 30 && Position.MarketPosition == MarketPosition.Flat)
                 {
@@ -165,11 +209,6 @@ namespace NinjaTrader.NinjaScript.Strategies
             //Add your custom strategy logic here.
         }
 
-        private void AddIndicators()
-        {
-            _rsi = RSI(BarsArray[0],rsiPeriod, 1);
-            AddChartIndicator(_rsi);
-        }
 
         private void ShowLevels(PriceLevel[] keyLevels)
         {
@@ -185,7 +224,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private void CalculateTradeTime()
         {
 
-            if ((ToTime(Time[0]) >= 153000 && ToTime(Time[0]) < 214000))
+            if ((ToTime(Time[0]) >= _tradingTimeStart && ToTime(Time[0]) < _tradingTimeEnd)) // 214000
             {
                 _canTrade = true;
             }
@@ -289,12 +328,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }  // Today IB high/low
             }
 
-            if (BarsInProgress == 2 && CurrentBars[2] >= 1) //16
+            if (BarsInProgress == 5 && CurrentBars[5] >= 1) //16
             {
-                lastWeekHigh = Highs[2][0];
-                lastWeekLow = Lows[2][0];
-                thisWeekHigh = Highs[2][0];
-                thisWeekLow = Lows[2][0];
+                lastWeekHigh = Highs[5][0];
+                lastWeekLow = Lows[5][0];
+                thisWeekHigh = Highs[5][0];
+                thisWeekLow = Lows[5][0];
             }
             #endregion
 
@@ -411,7 +450,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
         }
 
-
+        /*
         public class LevelsApp{
             PriceLevel[] PriceLevels = new PriceLevel[]{ };
 
@@ -433,8 +472,23 @@ namespace NinjaTrader.NinjaScript.Strategies
               //  parent.dupa = 5;
             }
 
+        } */
+
+
+        private void AddIndicators()
+        {
+            _ha = HeikenAshi8(BarsArray[1]);
+            _aroon = Aroon(BarsArray[2], 5);
+            _stoch = StochRSIMod2NT8(BarsArray[1], stochRsiPeriod, 3, 3, 18);
+            _iczimoku = ApolloIchimoku(BarsArray[1], 9, 26, 52, 26);
+            AddChartIndicator(_ha);
+            AddChartIndicator(_stoch);
+            AddChartIndicator(_aroon);
+            AddChartIndicator(_iczimoku);
+            _atr = ATR(BarsArray[3], atrPeriod);
+            AddChartIndicator(_atr);
+            _Vix = WVF(BarsArray[4]);
         }
-        
 
         // PARAMETERES DEFINITION
 
@@ -447,6 +501,59 @@ namespace NinjaTrader.NinjaScript.Strategies
             set { _rsiPeriod = value; }
         }
 
+        #endregion
+
+        #region Position Management
+
+        [Display(Name = "Strong Entry Size", GroupName = "Position Management", Order = 0)]
+        public int strongEntrySize
+        {
+            get { return _strongEntrySize; }
+            set { _strongEntrySize = value; }
+        }
+
+        [Display(Name = "Weak Entry Size", GroupName = "Position Management", Order = 0)]
+        public int weakEntrySize
+        {
+            get { return _weakEntrySize; }
+            set { _weakEntrySize = value; }
+        }
+
+        [Display(Name = "Runner Size", GroupName = "Position Management", Order = 0)]
+        public int runnerSize
+        {
+            get { return _runnerSize; }
+            set { _runnerSize = value; }
+        }
+
+        #endregion
+
+        #region Filters
+
+        [Display(Name = "ATR PERIOD", GroupName = "Filters", Order = 0)]
+        public int atrPeriod
+        {
+            get { return _atrPeriod; }
+            set { _atrPeriod = value; }
+        }
+
+        [Display(Name = "Aroon PERIOD", GroupName = "Filters", Order = 0)]
+        public int aroonPeriod
+        {
+            get { return _aroonPeriod; }
+            set { _aroonPeriod = value; }
+        }
+
+        #endregion
+
+        #region Triggers
+
+        [Display(Name = "Stoch RSI Period", GroupName = "Triggers", Order = 0)]
+        public int stochRsiPeriod
+        {
+            get { return _stochRsiPeriod; }
+            set { _stochRsiPeriod = value; }
+        }
         #endregion
     }
 }

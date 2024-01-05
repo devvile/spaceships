@@ -440,6 +440,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 profitTargetOrders = new List<Order>();
                 stopLossOrders = new List<Order>();
 
+
                 AddDataSeries(BarsPeriodType.Minute, 4);
                 AddDataSeries(BarsPeriodType.Minute, 16);
                 AddDataSeries(BarsPeriodType.Day, 1);
