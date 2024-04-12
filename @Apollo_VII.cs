@@ -43,6 +43,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         private double _maxLoss;
         private double _maxProfit;
 
+
+
         Random rnd = new Random();
         private int _aroonPeriod;
         private bool _useLongs;
@@ -66,8 +68,6 @@ namespace NinjaTrader.NinjaScript.Strategies
         private int _maxLossMargin;
         private double maxLossStop;
         private int _barsToCheck;
-        private int _extraEntryRsiLong;
-        private int _extraEntryRsiShort;
         private double _atrValue;
 
         private double _shortEntryPrice1;
@@ -213,12 +213,6 @@ namespace NinjaTrader.NinjaScript.Strategies
             set { _rsiEntryLong = value; }
         }
 
-        [Display(Name = "Extra Entry Stoch Rsi Long Value", GroupName = "Long", Order = 1)]
-        public int ExtraEntryRsiLong
-        {
-            get { return _extraEntryRsiLong; }
-            set { _extraEntryRsiLong = value; }
-        }
 
         [Display(Name = "ATR TARGET RATIO LONG", GroupName = "Long", Order = 2)]
         public double LongAtrRatio
@@ -283,12 +277,6 @@ namespace NinjaTrader.NinjaScript.Strategies
             set { _rsiEntryShort = value; }
         }
 
-        [Display(Name = "Extra Entry Stoch Rsi Short Value", GroupName = "Short", Order = 1)]
-        public int ExtraEntryRsiShort
-        {
-            get { return _extraEntryRsiShort; }
-            set { _extraEntryRsiShort = value; }
-        }
 
         [Display(Name = "Profit target Short", GroupName = "Short", Order = 2)]
         public double ProfitTargetShort1
@@ -440,7 +428,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                 profitTargetOrders = new List<Order>();
                 stopLossOrders = new List<Order>();
 
-
                 AddDataSeries(BarsPeriodType.Minute, 4);
                 AddDataSeries(BarsPeriodType.Minute, 16);
                 AddDataSeries(BarsPeriodType.Day, 1);
@@ -549,14 +536,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                     }
                 }
-            }
-            if (Position.MarketPosition == MarketPosition.Short && stochRsiExtra( ExtraEntryRsiShort, "Short") && status !="Short Extra" && status != "Breakeven" && status != "Breakeven2 Short")
-            {
-            //    _shortTwoOrder = EnterShort(LotSize2, "Short2");
-            }
-            else if (Position.MarketPosition == MarketPosition.Long && stochRsiExtra(ExtraEntryRsiLong, "Long") && status != "Long Extra"  && status != "Breakeven" && status != "Breakeven2 Long")
-            {
-           //    _longTwoOrder = EnterLong(LotSize2, "Long2");
             }
         }
 
@@ -818,6 +797,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
 
 
+
+
         #region tradeTime
         private void CalculateTradeTime()
         {
@@ -960,15 +941,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private void ShowEntryDetails(string signal)
         {
-            Print("~~~~~~~~~~~~~~~~~~~~~~~~");
-            Print("ENTRY DETAILS:");
-            Print(signal);
-            Print(Time[0]);
-            Print("IB High:");
-            Print(Levels(BarsArray[0]).IBHighs[0]);
-         //   Print("IB Low:");
-       //     Print(Levels(BarsArray[0]).IBLows[0]);
-            Print("~~~~~~~~~~~~~~~~~~~~~~~~");
+
         }
 
         private void MonitorStopProfit(Order order, double limitPrice, double stopPrice)
@@ -1023,6 +996,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
             }
         }
+
+
 
 
 

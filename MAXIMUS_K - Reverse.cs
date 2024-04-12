@@ -31,8 +31,14 @@ namespace NinjaTrader.NinjaScript.Strategies
         private Indicator _aroon;
 
 
-        private Order _longOneOrder;
-        private Order _shortOneOrder;
+        #region Orders
+        private Order _longBaseOrder;
+        private Order _longRunnerOrder;
+        private Order _shortBaseOrder;
+        private Order _shortRunnerOrder;
+        #endregion
+
+
         private Indicator _atr;
         private Indicator _stoch;
         private Indicator _aroonSlow;
@@ -50,6 +56,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         private bool UseRsi = true;
         private double _atrTargetRatio;
         private int _atrPeriod = 14;
+        private int _kamaPeriod = 14;
+        private int rthEndTime;
         #endregion
 
         #region My Parameters
@@ -207,8 +215,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         [Display(Name = "Kama period", GroupName = "Filters", Order = 0)]
         public int KamaPeriod
         {
-            get { return _atrPeriod; }
-            set { _atrPeriod = value; }
+            get { return _kamaPeriod; }
+            set { _kamaPeriod = value; }
         }
 
 
@@ -221,11 +229,12 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (State == State.SetDefaults)
             {
                 Description = @"Sandbox";
-                Name = "Maximus K Reverse";
+                Name = "Maximus K Reverse e";
                 Calculate = Calculate.OnBarClose;
                 BarsRequiredToTrade = 60;
+                rthEndTime = 215930;
 
-            }
+    }
 
             else if (State == State.Configure)
             {
@@ -237,7 +246,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 RealtimeErrorHandling = RealtimeErrorHandling.IgnoreAllErrors;
                 BarsRequiredToTrade = BarsToCheck;
                 AddDataSeries(BarsPeriodType.Minute, 4);
-                AddDataSeries(BarsPeriodType.Minute, 16);
+                AddDataSeries(BarsPeriodType.Minute, 15);
      //           SetStopLoss(CalculationMode.Ticks, 200);
             }
             else if (State == State.DataLoaded)
@@ -255,7 +264,12 @@ namespace NinjaTrader.NinjaScript.Strategies
             CalculateTradeTime();
             //      AdjustStop();
 
-
+            if (Position.MarketPosition != MarketPosition.Flat && ToTime(Time[0]) >= rthEndTime) // Exit all positions on session close
+            {
+                ExitLong();
+                ExitShort();
+                //  ShowLevels(keyLevels);
+            }
 
             int x = 2;
 
@@ -315,7 +329,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 
 
-                        _shortOneOrder = EnterShort(0, 1, "Short1");
+                        _shortRunnerOrder = EnterShort(0, 1, "Short Runner");
+                        _shortBaseOrder = EnterShort(0, 1, "Short Base");
                         status = "Short Default";
                     }
                     else if (_kama[1]  < HeikenAshi8(BarsArray[1]).HAClose[1] && _kama[0]  < HeikenAshi8(BarsArray[1]).HAClose[0] && noPositions() && AroonUp() && kerValue >= 0.5 && RSI(BarsArray[2], 14, 1)[0] > 30)// && Aroon(BarsArray[x], AroonPeriodSlow).Up[0] > 70)
@@ -327,7 +342,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                         Print(atrValue);
 
 
-                        _longOneOrder = EnterLong(0, 1, "Long1");
+                        _longRunnerOrder= EnterLong(0, 1, "Long Runner");
+                        _longBaseOrder = EnterLong(0, 1, "Long Base");
                         status = "Long Default";
                     }
 
@@ -370,11 +386,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                     
                    if (Aroon(BarsArray[2], AroonPeriodSlow).Down[0] > 40 && Aroon(BarsArray[2], AroonPeriodSlow).Up[0] < 20)
                    {
-                       ExitLong(0, 1, "Aroon Exit Long", "Long1");
-                   }else if(Aroon(BarsArray[2], AroonPeriodSlow).Up[0] > 30 && Aroon(BarsArray[2], AroonPeriodSlow).Down[0] < 20)
+                       ExitLong(0, 1, "Aroon Exit Long", "Long Runner");
+                       ExitLong(0, 1, "Aroon Exit Long", "Long Base");
+                    }
+                    else if(Aroon(BarsArray[2], AroonPeriodSlow).Up[0] > 30 && Aroon(BarsArray[2], AroonPeriodSlow).Down[0] < 20)
                    {
-                       ExitShort(0, 1, "Aroon Exit Short", "Short1");
-                   }
+                       ExitShort(0, 1, "Aroon Exit Short", "Short Runner");
+                       ExitShort(0, 1, "Aroon Exit Short", "Short Base");
+                    }
 
                    if(CrossAbove(Aroon(BarsArray[2], AroonPeriodSlow).Down, Aroon(BarsArray[2], AroonPeriodSlow).Up, 1) && Aroon(BarsArray[2], AroonPeriodSlow).Down[0] >50)
                     {
@@ -550,14 +569,14 @@ namespace NinjaTrader.NinjaScript.Strategies
             return order.OrderState == OrderState.Filled;
         }
 
-        private bool IsLongOrder1(Order order)
+        private bool IsLongRunner(Order order)
         {
-            return order == _longOneOrder;
+            return order == _longRunnerOrder;
         }
 
         private bool IsShortOrder1(Order order)
         {
-            return order == _shortOneOrder;
+            return order == _shortRunnerOrder;
         }
 
         protected override void OnOrderUpdate(Order order, double limitPrice, double stopPrice, int quantity, int filled, double averageFillPrice,
@@ -566,25 +585,25 @@ OrderState orderState, DateTime time, ErrorCode error, string comment)
 
             MonitorStopProfit(order, stopPrice, limitPrice);
 
-            if (OrderFilled(order) && IsLongOrder1(order))
+            if (OrderFilled(order) && IsLongRunner(order))
             {
                 _longEntryPrice1 = averageFillPrice;
-               stopLossPrice = calculateStopLong();
-                SetStopLoss(CalculationMode.Ticks, 200);
+              // stopLossPrice = calculateStopLong();
+                SetStopLoss(CalculationMode.Price, _longEntryPrice1 - atrValue *1.5);
          //       SetStopLoss(CalculationMode.Price, stopLossPrice);
       //          SetStopLoss(CalculationMode.Price, _longEntryPrice1 - atrValue *1.25);
-                SetProfitTarget("Long1", CalculationMode.Price, _longEntryPrice1 + atrValue*AtrTargetRatio);
+                SetProfitTarget("Long Base", CalculationMode.Price, _longEntryPrice1 + atrValue*AtrTargetRatio);
                 status = "Long Default";
             }
 
             else if (OrderFilled(order) && IsShortOrder1(order))
             {
                 _shortEntryPrice1 = averageFillPrice;
-                stopLossPrice = calculateStopShort();
-                        SetStopLoss(CalculationMode.Ticks, 200);
-                //        SetStopLoss(CalculationMode.Price, _shortEntryPrice1 + atrValue * 1.25);
+        //        stopLossPrice = calculateStopShort();
+                //        SetStopLoss(CalculationMode.Ticks, 200);
+                       SetStopLoss(CalculationMode.Price, _shortEntryPrice1 + atrValue * 1.5);
                 //SetStopLoss(CalculationMode.Price, stopLossPrice);
-                SetProfitTarget("Short1", CalculationMode.Price, _shortEntryPrice1 - atrValue * AtrTargetRatio);
+                SetProfitTarget("Short Base", CalculationMode.Price, _shortEntryPrice1 - atrValue * AtrTargetRatio);
                 status = "Short Default";
             }
         }
@@ -615,7 +634,7 @@ OrderState orderState, DateTime time, ErrorCode error, string comment)
 
             _kama = KAMA(BarsArray[1],2, KamaPeriod,30);
 
-            _aroonSlow = Aroon(BarsArray[0], AroonPeriodSlow);
+            _aroonSlow = Aroon(BarsArray[1], AroonPeriodSlow);
             _atr = ATR(BarsArray[2], AtrPeriod);
             _ker = EfficiencyRatioIndicator(BarsArray[1], 5, true);
       //      AddChartIndicator(_atr);
