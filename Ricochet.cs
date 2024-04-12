@@ -29,6 +29,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         #region declarations
 
         private Indicator _aroon;
+        private Indicator _levels;
 
 
         private Order _longOneOrder;
@@ -38,14 +39,12 @@ namespace NinjaTrader.NinjaScript.Strategies
         private Indicator _aroonSlow;
         private Indicator _aroonMid;
         private Indicator _aroonFast;
+        private int  _numberOfRetests;
 
         private double _aroonUp;
         private int _barsToCheck;
         private double _longStopMargin;
         private double _shortStopMargin;
-        private bool _canTrade = false;
-
-        private bool UseRsi = true;
         private double _atrTargetRatio;
         private int _atrPeriod = 14;
         #endregion
@@ -62,10 +61,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private int _aroonPeriod;
 
-        private bool _useLongs = true;
-        private bool _useShorts = true;
-        private bool _useAroon = true;
-
         private int _aroonFilter;
         private int _aroonPeriodFast;
         private int _aroonPeriodSlow;
@@ -77,96 +72,18 @@ namespace NinjaTrader.NinjaScript.Strategies
         private int _lotSize1;
         private int _lotSize2;
 
+        private bool _takeTests;
+        private bool _useLongs = true;
+        private bool _useShorts = true;
+        private bool _useAroon = true;
+        private bool _canTrade = false;
+        private bool UseRsi = true;
+
 
         private int BarNr = 0;  //sprawdzic <-----
         Random rnd = new Random();
 
         private string status = "Flat";
-
-
-        #endregion
-
-        #region Aroon
-
-        [Display(Name = "Aroon Period Fast", GroupName = "Aroon", Order = 0)]
-        public int AroonPeriodFast
-        {
-            get { return _aroonPeriodFast; }
-            set { _aroonPeriodFast = value; }
-        }
-
-
-        [Display(Name = "Aroon Period Slow", GroupName = "Aroon", Order = 0)]
-        public int AroonPeriodSlow
-        {
-            get { return _aroonPeriodSlow; }
-            set { _aroonPeriodSlow = value; }
-        }
-
-        [Display(Name = "Aroon Entry Filter", GroupName = "Aroon", Order = 0)]
-        public int AroonFilter
-        {
-            get { return _aroonFilter; }
-            set { _aroonFilter = value; }
-        }
-
-
-
-
-        #endregion
-
-
-
-        #region Longs
-
-        [Display(Name = "Long Stop Margin", GroupName = "LONGS", Order = 0)]
-        public double LongStopMargin
-        {
-            get { return _longStopMargin; }
-            set { _longStopMargin = value; }
-        }
-
-
-        #endregion
-
-        #region Shorts
-
-        [Display(Name = "Short Stop Margin", GroupName = "SHORTS", Order = 0)]
-        public double ShortStopMargin
-        {
-            get { return _shortStopMargin; }
-            set { _shortStopMargin = value; }
-        }
-
-        #endregion
-
-        #region Position Management
-
-        [Display(Name = "Bars to Check", GroupName = "Position Management", Order = 0)]
-        public int BarsToCheck
-        {
-            get { return _barsToCheck; }
-            set { _barsToCheck = value; }
-        }
-
-
-        [Display(Name = "Atr Target ratio", GroupName = "Position Management", Order = 0)]
-        public double AtrTargetRatio
-        {
-            get { return _atrTargetRatio; }
-            set { _atrTargetRatio = value; }
-        }
-
-        #endregion
-
-        #region Filters
-
-        [Display(Name = "Atr period", GroupName = "Filters", Order = 0)]
-        public int AtrPeriod
-        {
-            get { return _atrPeriod; }
-            set { _atrPeriod = value; }
-        }
 
 
         #endregion
@@ -181,7 +98,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Name = "Ricochet";
                 Calculate = Calculate.OnBarClose;
                 BarsRequiredToTrade = 60;
+                _barsToCheck = 60;
             }
+
 
             else if (State == State.Configure)
             {
@@ -192,6 +111,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 RealtimeErrorHandling = RealtimeErrorHandling.IgnoreAllErrors;
                 BarsRequiredToTrade = BarsToCheck;
+                Levels4 myLevels4 = Levels4();
+                AddChartIndicator(myLevels4);
                 AddDataSeries(BarsPeriodType.Minute, 4);
                 AddDataSeries(BarsPeriodType.Minute, 1);
             }
@@ -224,9 +145,20 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 if (BarsInProgress == 0)
                 {
-
-                    atrValue = _atr[0];
-
+                    double todayGlobexHigh = Levels4().GetTodayGlobexHigh(); // Correctly call the method
+                    double todayGlobexLow = Levels4().GetTodayGlobexLow();
+                    if (_takeTests)
+                    {
+                        Print(ToTime(Time[0]));
+                        atrValue = _atr[0];
+                        Print("~~~~");
+                        Print("Globex High");
+                        Print("~~~~");
+                        Print(todayGlobexHigh);
+                        Print("~~~~");
+                        Print("Globex Low");
+                        Print(todayGlobexLow);
+                    }
                     //Exits
 
                 }
@@ -249,6 +181,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
 
 
+        // zaimplementowac czasy Ziomy i letni dla usa dla RTH i dla LEVELS
 
 
         private void CalculateTradeTime()
@@ -257,10 +190,12 @@ namespace NinjaTrader.NinjaScript.Strategies
             if ((ToTime(Time[0]) >= 153000 && ToTime(Time[0]) < 214000))
             {
                 _canTrade = true;
+                _takeTests = true;
             }
             else
             {
                 _canTrade = false;
+                _takeTests = false;
             }
         }
 
@@ -315,5 +250,117 @@ OrderState orderState, DateTime time, ErrorCode error, string comment)
             AddChartIndicator(_atr);
             AddChartIndicator(_aroonSlow);
         }
+
+
+        #region Params
+
+
+        #region  Test Parameters
+
+        [Display(Name = "Number Of retests", GroupName = "Test Parameters", Order = 0)]
+        public int numberOfRetests
+        {
+            get { return _numberOfRetests; }
+            set { _numberOfRetests = value; }
+        }
+
+
+
+        #endregion
+
+        #region Position Management
+
+        [Display(Name = "Bars to Check", GroupName = "Position Management", Order = 0)]
+        public int BarsToCheck
+        {
+            get { return _barsToCheck; }
+            set { _barsToCheck = value; }
+        }
+
+
+        [Display(Name = "Atr Target ratio", GroupName = "Position Management", Order = 0)]
+        public double AtrTargetRatio
+        {
+            get { return _atrTargetRatio; }
+            set { _atrTargetRatio = value; }
+        }
+
+        #endregion
+
+        #region Filters
+
+        [Display(Name = "Atr period", GroupName = "Filters", Order = 0)]
+        public int AtrPeriod
+        {
+            get { return _atrPeriod; }
+            set { _atrPeriod = value; }
+        }
+
+
+        #endregion
+
+
+        #region Aroon
+
+        [Display(Name = "Aroon Period Fast", GroupName = "Aroon", Order = 0)]
+        public int AroonPeriodFast
+        {
+            get { return _aroonPeriodFast; }
+            set { _aroonPeriodFast = value; }
+        }
+
+
+        [Display(Name = "Aroon Period Slow", GroupName = "Aroon", Order = 0)]
+        public int AroonPeriodSlow
+        {
+            get { return _aroonPeriodSlow; }
+            set { _aroonPeriodSlow = value; }
+        }
+
+        [Display(Name = "Aroon Entry Filter", GroupName = "Aroon", Order = 0)]
+        public int AroonFilter
+        {
+            get { return _aroonFilter; }
+            set { _aroonFilter = value; }
+        }
+
+
+
+
+        #endregion
+
+        /*
+
+
+#region Longs
+
+[Display(Name = "Long Stop Margin", GroupName = "LONGS", Order = 0)]
+public double LongStopMargin
+{
+    get { return _longStopMargin; }
+    set { _longStopMargin = value; }
+}
+
+
+#endregion
+
+#region Shorts
+
+[Display(Name = "Short Stop Margin", GroupName = "SHORTS", Order = 0)]
+public double ShortStopMargin
+{
+    get { return _shortStopMargin; }
+    set { _shortStopMargin = value; }
+}
+
+#endregion
+
+
+*/
+
+        #endregion
+
     }
+
+
 }
