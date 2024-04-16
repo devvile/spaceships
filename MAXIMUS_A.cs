@@ -215,6 +215,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Name = "Maximus A";
                 Calculate = Calculate.OnBarClose;
                 BarsRequiredToTrade = 60;
+                SetStopLoss(CalculationMode.Ticks, 40);
 
             }
 

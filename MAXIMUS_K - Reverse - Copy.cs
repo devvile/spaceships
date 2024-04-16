@@ -237,7 +237,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 RealtimeErrorHandling = RealtimeErrorHandling.IgnoreAllErrors;
                 BarsRequiredToTrade = BarsToCheck;
                 AddDataSeries(BarsPeriodType.Minute, 4);
-                AddDataSeries(BarsPeriodType.Minute, 16);
+                AddDataSeries(BarsPeriodType.Minute, 15);
      //           SetStopLoss(CalculationMode.Ticks, 200);
             }
             else if (State == State.DataLoaded)

@@ -24,7 +24,7 @@ using System.ComponentModel;
 
 namespace NinjaTrader.NinjaScript.Strategies
 {
-    public class Apollo_VIII : Strategy
+    public class Apollo_VIII: Strategy
     {
         #region Declarations
         private int LotSize1;
@@ -66,8 +66,6 @@ namespace NinjaTrader.NinjaScript.Strategies
         private int _maxLossMargin;
         private double maxLossStop;
         private int _barsToCheck;
-        private int _extraEntryRsiLong;
-        private int _extraEntryRsiShort;
         private double _atrValue;
 
         private double _shortEntryPrice1;
@@ -89,6 +87,9 @@ namespace NinjaTrader.NinjaScript.Strategies
         private int _trailThresholdShort2;
         private int _trail2LevelShort;
 
+        private int _tradingTimeStart;
+        private int _tradingTimeEnd;
+
         private int _trailThresholdLong;
         private int _trailThresholdLong2;
         private int _trail2LevelLong;
@@ -104,6 +105,12 @@ namespace NinjaTrader.NinjaScript.Strategies
         private int _rsiEntryLong;
         private double _vixFilterValue;
 
+        private bool _shortTargetInRange;
+        private bool _longTargetInRange;
+
+        private int _minTickTargetLong;
+        private int _minTickTargetShort;
+
         private int _stochRsiPeriod;
         private int _fastMAPeriod;
         private int _slowMAPeriod;
@@ -115,6 +122,37 @@ namespace NinjaTrader.NinjaScript.Strategies
         //   private int _minuteIndex =0 ;
         #endregion
 
+
+        #region Levels Declarations
+
+        double todayGlobexLow;
+        double todayGlobexHigh;
+        double yesterdayGlobexLow;
+        double yesterdayGlobexHigh;
+        int globexStartTime;
+        double todayRTHLow;
+        double todayRTHHigh;
+        double yesterdayRTHLow;
+        double yesterdayRTHHigh;
+        int rthStartTime = 153000;
+        int rthEndTime = 215900;
+        double lastWeekHigh;
+        double lastWeekLow;
+        double thisWeekHigh;
+        double thisWeekLow;
+        double IBLow;
+        double IBHigh;
+        int IbEndTime;
+
+
+        int _ticksToTarget;
+        PriceLevel[] keyLevels = { };
+        PriceLevel[] keyLevelsInDistanceLong = { };
+        PriceLevel[] keyLevelsInDistanceShort = { };
+
+
+
+        #endregion
 
         #region Config
 
@@ -213,12 +251,6 @@ namespace NinjaTrader.NinjaScript.Strategies
             set { _rsiEntryLong = value; }
         }
 
-        [Display(Name = "Extra Entry Stoch Rsi Long Value", GroupName = "Long", Order = 1)]
-        public int ExtraEntryRsiLong
-        {
-            get { return _extraEntryRsiLong; }
-            set { _extraEntryRsiLong = value; }
-        }
 
         [Display(Name = "ATR TARGET RATIO LONG", GroupName = "Long", Order = 2)]
         public double LongAtrRatio
@@ -264,6 +296,13 @@ namespace NinjaTrader.NinjaScript.Strategies
             set { _trail2LevelLong = value; }
         }
 
+        [Display(Name = "Min Ticks to Level Long", GroupName = "Long", Order = 6)]
+        public int MinTicksTargetLong
+        {
+            get { return _minTickTargetLong; }
+            set { _minTickTargetLong = value; }
+        }
+
 
         #endregion
 
@@ -283,12 +322,6 @@ namespace NinjaTrader.NinjaScript.Strategies
             set { _rsiEntryShort = value; }
         }
 
-        [Display(Name = "Extra Entry Stoch Rsi Short Value", GroupName = "Short", Order = 1)]
-        public int ExtraEntryRsiShort
-        {
-            get { return _extraEntryRsiShort; }
-            set { _extraEntryRsiShort = value; }
-        }
 
         [Display(Name = "Profit target Short", GroupName = "Short", Order = 2)]
         public double ProfitTargetShort1
@@ -333,6 +366,14 @@ namespace NinjaTrader.NinjaScript.Strategies
             get { return _trail2LevelShort; }
             set { _trail2LevelShort = value; }
         }
+
+        [Display(Name = "Min Ticks to Level Short", GroupName = "Short", Order = 6)]
+        public int MinTicksTargetShort
+        {
+            get { return _minTickTargetShort; }
+            set { _minTickTargetShort = value; }
+        }
+ 
 
 
         #endregion
@@ -399,7 +440,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (State == State.SetDefaults)
             {
                 Description = @"Apollo VIII";
-                Name = "Apollo VIII Levels";
+                Name = "Apollo VIII  Levels treshold";
                 Calculate = Calculate.OnBarClose;
                 _userLotSize1 = 1;
                 _userLotSize2 = 2;
@@ -428,6 +469,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 IsInstantiatedOnEachOptimizationIteration = false;
 
 
+
+                _tradingTimeStart = 153000;
+                _tradingTimeEnd = 214000;
+
             }
 
             else if (State == State.Configure)
@@ -440,9 +485,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 profitTargetOrders = new List<Order>();
                 stopLossOrders = new List<Order>();
 
-                AddDataSeries(BarsPeriodType.Minute, 1);
                 AddDataSeries(BarsPeriodType.Minute, 4);
-                AddDataSeries(BarsPeriodType.Minute, 16);
+                AddDataSeries(BarsPeriodType.Minute, 15);
                 AddDataSeries(BarsPeriodType.Day, 1);
                 AddDataSeries(BarsPeriodType.Week, 1);
 
@@ -457,13 +501,21 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         protected override void OnBarUpdate()
         {
-            if (CurrentBars[0] < BarsRequiredToTrade || CurrentBars[1] < BarsRequiredToTrade || CurrentBars[2] < BarsRequiredToTrade || CurrentBars[3] < BarsRequiredToTrade || CurrentBars[4] < 10 || CurrentBars[5] < 1)
+            if (CurrentBars[0] < BarsRequiredToTrade || CurrentBars[1] < BarsRequiredToTrade || CurrentBars[2] < BarsRequiredToTrade || CurrentBars[3] < 10 || CurrentBars[4] < 1)
                 return;
 
             CalculateTradeTime();
 
 
-            if (_canTrade && BarsInProgress == 1 && _Vix[0] >VixFilterValue)
+            if (Position.MarketPosition != MarketPosition.Flat && BarsInProgress == 0 && ToTime(Time[0]) >= rthEndTime) // Exit all positions on session close
+            {
+                ExitLong();
+                ExitShort();
+
+                //  ShowLevels(keyLevels);
+            }
+
+            if (_canTrade && BarsInProgress == 0 && _Vix[0] > VixFilterValue)
             {
                 _atrValue = _atr[0];
                 Trail();
@@ -472,7 +524,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             }
 
-            if(BarsInProgress == 3)
+            if (BarsInProgress == 3)
             {
 
             }
@@ -480,7 +532,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private void Trail()
         {
-            if (Close[0] >= Position.AveragePrice + (TrailThresholdLong * TickSize) && Position.MarketPosition == MarketPosition.Long && status!= "Breakeven2 Short" && status != "Breakeven2 Long")
+            if (Close[0] >= Position.AveragePrice + (TrailThresholdLong * TickSize) && Position.MarketPosition == MarketPosition.Long && status != "Breakeven2 Short" && status != "Breakeven2 Long")
             {
                 status = "Breakeven";
             }
@@ -497,6 +549,260 @@ namespace NinjaTrader.NinjaScript.Strategies
                 status = "Breakeven2 Long";
             }
         }
+
+
+        private void CalculateLevelsDistance(double currentPrice)
+        {
+            _shortTargetInRange = false;
+            _longTargetInRange = false;
+
+
+            //Long
+
+
+            List<PriceLevel> levelsAbovePrice = new List<PriceLevel>();
+
+            foreach (PriceLevel level in keyLevels)
+            {
+                if ((level.Price - currentPrice) >= 0)
+                {
+                    levelsAbovePrice.Add(level);
+                };
+            };
+
+
+            levelsAbovePrice = new List<PriceLevel>(levelsAbovePrice.OrderBy(level => level.Price));
+            PriceLevel closestLevel = levelsAbovePrice.First(); //long
+            double distance = closestLevel.Price - currentPrice;
+
+
+
+            if (distance > MinTicksTargetLong * TickSize)
+            {
+                _longTargetInRange = true;
+            }
+            else
+            {
+                _longTargetInRange = false;
+
+            }
+
+            //Short
+
+            List<PriceLevel> levelsBelowPrice = new List<PriceLevel>();
+
+            foreach (PriceLevel level in keyLevels)
+            {
+                if ((currentPrice >= level.Price))
+                {
+                    levelsBelowPrice.Add(level);
+                };
+            };
+
+            levelsBelowPrice = new List<PriceLevel>(levelsBelowPrice.OrderBy(level => level.Price));
+            PriceLevel closestBelowLevel = levelsBelowPrice.Last(); //Short
+            double shortDistance = currentPrice - closestBelowLevel.Price;
+
+
+            Print("xxxxxxxxxxxxxxxxxxxxxx");
+            Print("Current Price is " + currentPrice);
+            Print("Closest Level is: " + closestBelowLevel.Name);
+            Print("Closest Level is: " + closestBelowLevel.Price);
+            Print("Distance is " + shortDistance);
+            Print("xxxxxxxxxxxxxxxxxxxxxx");
+
+
+            if (shortDistance > MinTicksTargetShort * TickSize)
+            {
+                _shortTargetInRange = true;
+            }
+            else
+            {
+                _shortTargetInRange = false;
+
+            }
+        }
+
+        private void CalculateLevels()
+        {
+            //     Print("Calculating Key Levels...");
+
+
+
+            //Calculating Levels aand assingment to  keyLevels array;
+
+            #region Levels calculation
+
+            if (Bars.IsFirstBarOfSession && BarsInProgress == 1)
+            {
+                if (thisWeekHigh == 0)
+                {
+                    thisWeekHigh = High[0];
+                }
+                if (thisWeekLow == 0)
+                {
+                    thisWeekLow = Low[0];
+                }
+
+            }
+
+            if (BarsInProgress == 1)
+            {
+
+                if (High[0] > thisWeekHigh)
+                {
+                    thisWeekHigh = High[0];
+                };
+
+                if (Low[0] < thisWeekLow)
+                {
+                    thisWeekLow = Low[0];
+                };
+
+                if (ToTime(Time[0]) == globexStartTime)
+                {
+                    yesterdayGlobexLow = todayGlobexLow;
+                    yesterdayGlobexHigh = todayGlobexHigh;
+                    yesterdayRTHLow = todayRTHLow;
+                    yesterdayRTHHigh = todayRTHHigh;
+                    todayGlobexLow = Low[0];
+                    todayGlobexHigh = High[0];
+                }
+
+                else if (ToTime(Time[0]) == rthStartTime)
+                {
+
+                    todayRTHLow = Low[0];
+                    todayRTHHigh = High[0];
+                    IBLow = Low[0];
+                    IBHigh = High[0];
+                }
+
+                if (isGlobex(ToTime(Time[0])))
+                {
+                    if (High[0] > todayGlobexHigh)
+                    {
+                        todayGlobexHigh = High[0];
+                    }
+                    else if (Low[0] < todayGlobexLow)
+                    {
+                        todayGlobexLow = Low[0];
+                    }
+                }  // Today Globex high/low
+
+                if (isRTH(ToTime(Time[0])))
+                {
+                    if (High[0] > todayRTHHigh)
+                    {
+                        todayRTHHigh = High[0];
+                    }
+                    else if (Low[0] < todayRTHLow)
+                    {
+                        todayRTHLow = Low[0];
+                    }
+                }  // Today RTH high/low
+
+
+                if (isIB(ToTime(Time[0])))
+                {
+                    if (High[0] > IBHigh)
+                    {
+                        IBHigh = High[0];
+                    }
+                    else if (Low[0] < IBLow)
+                    {
+                        IBLow = Low[0];
+                    }
+                }  // Today IB high/low
+            }
+
+            if (BarsInProgress == 4 && CurrentBars[2] >= 1) //16
+            {
+                lastWeekHigh = Highs[4][0];
+                lastWeekLow = Lows[4][0];
+                thisWeekHigh = Highs[4][0];
+                thisWeekLow = Lows[4][0];
+            }
+            #endregion
+
+            PriceLevel[] keyLevelsFilled = new PriceLevel[]
+            {
+              new PriceLevel("Today Globex High", todayGlobexHigh,0,false),
+              new PriceLevel("Today Globex Low", todayGlobexLow,0,false),
+              new PriceLevel("Yesterday Globex High", yesterdayGlobexHigh,0,false),
+              new PriceLevel("Yesterday Globex Low", yesterdayGlobexLow,0,false),
+              new PriceLevel("Today RTH High", todayRTHHigh,0,false),
+              new PriceLevel("Today RTH Low", todayRTHLow,0,false),
+              new PriceLevel("Yesterdat RTH High", yesterdayRTHHigh,0,false),
+              new PriceLevel("YesterDay RTH Low", yesterdayRTHLow,0,false),
+              new PriceLevel("IB High", IBHigh,0,false),
+              new PriceLevel("IB Low", IBLow,0,false),
+              new PriceLevel("Last Week High", lastWeekHigh,0,false),
+              new PriceLevel("Last Week Low", lastWeekLow,0,false),
+              new PriceLevel("This Week High", thisWeekHigh,0,false),
+              new PriceLevel("This Week Low", thisWeekLow,0,false),
+              new PriceLevel("VWAP", VWAP(BarsArray[1]).PlotVWAP[0],0,false)
+            };
+
+            keyLevels = keyLevelsFilled;
+        }
+
+        #region LevelsTimeFunctions
+        private bool isGlobex(int time)
+        {
+            if (time >= globexStartTime && time <= rthStartTime)
+            {
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+        }
+
+        private bool isRTH(int time)
+        {
+            if (time >= rthStartTime && time <= rthEndTime)
+            {
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+        }
+
+
+        private bool isIB(int time)
+        {
+            if (time >= rthStartTime && time <= IbEndTime)
+            {
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+        }
+
+        public class PriceLevel
+        {
+
+            public string Name { get; set; }
+            public double Price { get; set; }
+            public double Diff { get; set; }
+            public bool InRange { get; set; }
+            public PriceLevel(string name, double price, double difference, bool isInRange)
+            {
+                Name = name;
+                Price = price;
+                Diff = difference;
+                InRange = isInRange;
+            }
+        }
+        #endregion
+
+
 
         private void IchimokuMode()
         {
@@ -519,9 +825,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                     }
                     else if (signal == "Weak Long")
                     {
-                       setSmallPositionSizes();
-                       _longOneOrder = EnterLong(LotSize1, "Long1");
-                       _longTwoOrder = EnterLong(LotSize2, "Long2");
+                        setSmallPositionSizes();
+                        _longOneOrder = EnterLong(LotSize1, "Long1");
+                        _longTwoOrder = EnterLong(LotSize2, "Long2");
                         //                    _longThreeOrder = EnterLong(LotSize2, "Long3");
 
                     }
@@ -532,36 +838,28 @@ namespace NinjaTrader.NinjaScript.Strategies
                     if (signal == "Strong Short")
                     {
 
-                            setUserPoisitonSizes();
-                            _shortOneOrder = EnterShort(LotSize1, "Short1");
-                            _shortTwoOrder = EnterShort(LotSize2, "Short2");
-                            _shortThreeOrder = EnterShort(LotSize3, "Short3");
-                            ShowEntryDetails(signal);
+                        setUserPoisitonSizes();
+                        _shortOneOrder = EnterShort(LotSize1, "Short1");
+                        _shortTwoOrder = EnterShort(LotSize2, "Short2");
+                        _shortThreeOrder = EnterShort(LotSize3, "Short3");
+                        ShowEntryDetails(signal);
                     }
-                    else if ( signal == "Weak Short")
+                    else if (signal == "Weak Short")
                     {
 
-                            setSmallPositionSizes();
-                           _shortOneOrder = EnterShort(LotSize1, "Short1");
-                           _shortTwoOrder = EnterShort(LotSize2, "Short2");
-                            //                   _shortThreeOrder = EnterShort(LotSize3, "Short3");
-                            ShowEntryDetails(signal);
+                        setSmallPositionSizes();
+                        _shortOneOrder = EnterShort(LotSize1, "Short1");
+                        _shortTwoOrder = EnterShort(LotSize2, "Short2");
+                        //                   _shortThreeOrder = EnterShort(LotSize3, "Short3");
+                        ShowEntryDetails(signal);
 
                     }
                 }
             }
-            if (Position.MarketPosition == MarketPosition.Short && stochRsiExtra( ExtraEntryRsiShort, "Short") && status !="Short Extra" && status != "Breakeven" && status != "Breakeven2 Short")
-            {
-            //    _shortTwoOrder = EnterShort(LotSize2, "Short2");
-            }
-            else if (Position.MarketPosition == MarketPosition.Long && stochRsiExtra(ExtraEntryRsiLong, "Long") && status != "Long Extra"  && status != "Breakeven" && status != "Breakeven2 Long")
-            {
-           //    _longTwoOrder = EnterLong(LotSize2, "Long2");
-            }
         }
 
 
-    private void ExitOnMaxProfitLoss()
+        private void ExitOnMaxProfitLoss()
         {
             if (Bars.IsFirstBarOfSession)
             {
@@ -604,7 +902,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             else if (status == "Breakeven2 Long")
             {
-                SetStopLoss(CalculationMode.Ticks, Trail2LevelLong );
+                SetStopLoss(CalculationMode.Ticks, Trail2LevelLong);
             }
             else if (status == "Breakeven2 Short")
             {
@@ -630,22 +928,22 @@ namespace NinjaTrader.NinjaScript.Strategies
         private bool applyFilters()
         {
             if (_atr[0] >= AtrFilterValue)
-                {
-                    return true;
-                }
-                else
-                {
-                    return false;
-                }
+            {
+                return true;
+            }
+            else
+            {
+                return false;
+            }
         }
 
         private string calculateSignal()
         {
             string signalType = "No Signal";
-            double recentSpanA = ApolloIchimoku(BarsArray[1], 9, 26, 52, 26).SpanALine[26];
-            double recentSpanB = ApolloIchimoku(BarsArray[1], 9, 26, 52, 26).SpanBLine[26];
-            double conversionLine = ApolloIchimoku(BarsArray[1], 9, 26, 52, 26).ConversionLine[0];
-            double baseline = ApolloIchimoku(BarsArray[1], 9, 26, 52, 26).BaseLine[0];
+            double recentSpanA = ApolloIchimoku(BarsArray[0], 9, 26, 52, 26).SpanALine[26];
+            double recentSpanB = ApolloIchimoku(BarsArray[0], 9, 26, 52, 26).SpanBLine[26];
+            double conversionLine = ApolloIchimoku(BarsArray[0], 9, 26, 52, 26).ConversionLine[0];
+            double baseline = ApolloIchimoku(BarsArray[0], 9, 26, 52, 26).BaseLine[0];
             string cloud = calculateCloud(recentSpanA, recentSpanB);
 
             if (conversionLine > baseline && cloud == "Green" && IsAroonUptrend())
@@ -713,22 +1011,22 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private bool previousCandleRed()
         {
-            return HeikenAshi8(BarsArray[1]).HAOpen[0] > HeikenAshi8(BarsArray[1]).HAClose[0] && HeikenAshi8(BarsArray[1]).HAOpen[1] < HeikenAshi8(BarsArray[1]).HAClose[1];
+            return HeikenAshi8(BarsArray[0]).HAOpen[0] > HeikenAshi8(BarsArray[0]).HAClose[0] && HeikenAshi8(BarsArray[0]).HAOpen[1] < HeikenAshi8(BarsArray[0]).HAClose[1];
         }
 
         private bool previousCandleGreen()
         {
-            return HeikenAshi8(BarsArray[1]).HAOpen[0] < HeikenAshi8(BarsArray[1]).HAClose[0] && HeikenAshi8(BarsArray[1]).HAOpen[1] > HeikenAshi8(BarsArray[1]).HAClose[1];
+            return HeikenAshi8(BarsArray[0]).HAOpen[0] < HeikenAshi8(BarsArray[0]).HAClose[0] && HeikenAshi8(BarsArray[0]).HAOpen[1] > HeikenAshi8(BarsArray[0]).HAClose[1];
         }
 
         private bool IsAroonUptrend()
         {
-            return Aroon(BarsArray[3],AroonPeriod).Up[0] > 70;
+            return Aroon(BarsArray[2], AroonPeriod).Up[0] > 70;
         }
 
         private bool IsAroonDowntrend()
         {
-            return Aroon(BarsArray[3], AroonPeriod).Down[0] > 70;
+            return Aroon(BarsArray[2], AroonPeriod).Down[0] > 70;
         }
 
 
@@ -739,37 +1037,38 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private bool stochRsiEntry(int entryValue, string positionType)
         {
-            _stochFast = StochRSIMod2NT8(BarsArray[0],StochRsiPeriod, FastMAPeriod, SlowMAPeriod, LookBack).SK[1];
+            _stochFast = StochRSIMod2NT8(BarsArray[0], StochRsiPeriod, FastMAPeriod, SlowMAPeriod, LookBack).SK[1];
             if (positionType == "Long")
             {
-                    return _stochFast <= entryValue;
+                return _stochFast <= entryValue;
             }
-                else if (positionType == "Short")
+            else if (positionType == "Short")
             {
-                    return _stochFast >= entryValue;
+                return _stochFast >= entryValue;
             }
-                else
+            else
             {
-                    return false;
+                return false;
             }
         }
 
         private bool stochRsiExtra(int entryValue, string positionType)
         {
-           double _stochFastPrevious = StochRSIMod2NT8(BarsArray[1],StochRsiPeriod, FastMAPeriod, SlowMAPeriod, LookBack).SK[1];
-           double _stochFastLast = StochRSIMod2NT8(BarsArray[1],StochRsiPeriod, FastMAPeriod, SlowMAPeriod, LookBack).SK[0];
-            if (positionType=="Short" && _stochFastPrevious > entryValue && _stochFastLast < entryValue )
+            double _stochFastPrevious = StochRSIMod2NT8(BarsArray[0], StochRsiPeriod, FastMAPeriod, SlowMAPeriod, LookBack).SK[1];
+            double _stochFastLast = StochRSIMod2NT8(BarsArray[0], StochRsiPeriod, FastMAPeriod, SlowMAPeriod, LookBack).SK[0];
+            if (positionType == "Short" && _stochFastPrevious > entryValue && _stochFastLast < entryValue)
             {
                 return true;
             }
-            else if(positionType== "Long" && _stochFastPrevious < entryValue && _stochFastLast > entryValue)
+            else if (positionType == "Long" && _stochFastPrevious < entryValue && _stochFastLast > entryValue)
             {
                 return true;
-            }else
+            }
+            else
             {
                 return false;
             }
-         }
+        }
 
         protected override void OnOrderUpdate(Order order, double limitPrice, double stopPrice, int quantity, int filled, double averageFillPrice,
         OrderState orderState, DateTime time, ErrorCode error, string comment)
@@ -783,9 +1082,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             else if (OrderFilled(order) && IsLongOrder2(order))
             {
-                  SetProfitTarget("Long2", CalculationMode.Price, _longEntryPrice1 + _atrValue * LongAtrRatio);
-         //       SetProfitTarget("Long2", CalculationMode.Price, _longEntryPrice1 + ProfitTargetLong1* TickSize);
-         //       status = "Long Extra";
+                SetProfitTarget("Long2", CalculationMode.Price, _longEntryPrice1 + _atrValue * LongAtrRatio);
+                //       SetProfitTarget("Long2", CalculationMode.Price, _longEntryPrice1 + ProfitTargetLong1* TickSize);
+                //       status = "Long Extra";
             }
             else if (OrderFilled(order) && IsLongOrder3(order))
             {
@@ -796,14 +1095,14 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 _shortEntryPrice1 = averageFillPrice;
                 stopLossPrice = calculateStopShort();
-        //        SetProfitTarget("Short1", CalculationMode.Price, _shortEntryPrice1 - _atrValue * ShortAtrRatio);
-                    SetProfitTarget("Short1", CalculationMode.Ticks, ProfitTargetShort1);
+                //        SetProfitTarget("Short1", CalculationMode.Price, _shortEntryPrice1 - _atrValue * ShortAtrRatio);
+                SetProfitTarget("Short1", CalculationMode.Ticks, ProfitTargetShort1);
                 status = "Short Default";
             }
             else if (OrderFilled(order) && IsShortOrder2(order))
             {
                 //SetProfitTarget("Short2", CalculationMode.Price, _shortEntryPrice1 - _atrValue * ShortAtrRatio);
-                      SetProfitTarget("Short2", CalculationMode.Ticks, ProfitTargetShort1);
+                SetProfitTarget("Short2", CalculationMode.Ticks, ProfitTargetShort1);
                 //       SetProfitTarget("Short2", CalculationMode.Price, _shortEntryPrice1 - ProfitTargetShort1 * TickSize);
                 //    status = "Short Extra";
             }
@@ -882,7 +1181,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             int i = 0;
             while (i < BarsToCheck)
             {
-                lows.Add(Lows[1][i]);
+                lows.Add(Lows[0][i]);
 
                 i++; // increment
             }
@@ -907,7 +1206,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             int i = 0;
             while (i < BarsToCheck)
             {
-                highs.Add(Highs[1][i]);
+                highs.Add(Highs[0][i]);
 
                 i++; // increment
             }
@@ -931,17 +1230,17 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private void ShowInfo()
         {
-            double recentSpanA = ApolloIchimoku(BarsArray[1],9, 26, 52, 26).SpanALine[26];
-            double recentSpanB = ApolloIchimoku(BarsArray[1],9, 26, 52, 26).SpanBLine[26];
+            double recentSpanA = ApolloIchimoku(BarsArray[0], 9, 26, 52, 26).SpanALine[26];
+            double recentSpanB = ApolloIchimoku(BarsArray[0], 9, 26, 52, 26).SpanBLine[26];
             Print(Time[0]);
             Print("Price:");
             Print(Close[0]);
             Print("ICHIMOKU");
             Print("**************");
             Print("ConversionLine");
-            Print(ApolloIchimoku(BarsArray[1],9, 26, 52, 26).ConversionLine[0]);
+            Print(ApolloIchimoku(BarsArray[0], 9, 26, 52, 26).ConversionLine[0]);
             Print("BaseLine");
-            Print(ApolloIchimoku(BarsArray[1],9, 26, 52, 26).BaseLine[0]);
+            Print(ApolloIchimoku(BarsArray[0], 9, 26, 52, 26).BaseLine[0]);
             Print("SpanALine");
             Print(recentSpanA);
             Print("SpanBLine");
@@ -960,15 +1259,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private void ShowEntryDetails(string signal)
         {
-            Print("~~~~~~~~~~~~~~~~~~~~~~~~");
-            Print("ENTRY DETAILS:");
-            Print(signal);
-            Print(Time[0]);
-            Print("IB High:");
-            Print(Levels4Apollo(BarsArray[1]).IBHighs[0]);
-         //   Print("IB Low:");
-       //     Print(Levels(BarsArray[0]).IBLows[0]);
-            Print("~~~~~~~~~~~~~~~~~~~~~~~~");
+
         }
 
         private void MonitorStopProfit(Order order, double limitPrice, double stopPrice)
@@ -1028,17 +1319,17 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private void addIndicators()
         {
-            _ha = HeikenAshi8(BarsArray[1]);
-            _aroon = Aroon(BarsArray[2],AroonPeriod);
-            _stoch = StochRSIMod2NT8(BarsArray[1],StochRsiPeriod, FastMAPeriod, SlowMAPeriod, LookBack);
-            _iczimoku = ApolloIchimoku(BarsArray[1],9, 26, 52, 26);
+            _ha = HeikenAshi8(BarsArray[0]);
+            _aroon = Aroon(BarsArray[1], AroonPeriod);
+            _stoch = StochRSIMod2NT8(BarsArray[0], StochRsiPeriod, FastMAPeriod, SlowMAPeriod, LookBack);
+            _iczimoku = ApolloIchimoku(BarsArray[0], 9, 26, 52, 26);
             AddChartIndicator(_ha);
             AddChartIndicator(_stoch);
             AddChartIndicator(_aroon);
             AddChartIndicator(_iczimoku);
-            _atr = ATR(BarsArray[3],AtrPeriod);
+            _atr = ATR(BarsArray[2], AtrPeriod);
             AddChartIndicator(_atr);
-            _Vix = WVF(BarsArray[4]);
+            _Vix = WVF(BarsArray[3]);
         }
     }
 }
