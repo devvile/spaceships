@@ -30,23 +30,41 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private Indicator _aroon;
         private Indicator _levels;
-
+        private Indicator _aroonFast;
+        private Indicator _rvol;
+        private int _numberOfRetests;
+        private int _testTreshold;
+        private int _breakoutTreshold;
+        private int retestCount;
+        private DateTime lastResetTime;
+        private bool _takeTests;
+        private bool _breakoutValid;
+        int _rthStartTime;
+        int _rthEndTime;
+        int _IbEndTime;
+        double rangeHigh;
+        double rangeLow;
+        public int _stop;
+        public int _target1;
+        public int _target2;
 
         private Order _longOneOrder;
+        private Order _longTwoOrder;
         private Order _shortOneOrder;
         private Indicator _atr;
         private Indicator _stoch;
         private Indicator _aroonSlow;
         private Indicator _aroonMid;
-        private Indicator _aroonFast;
-        private int  _numberOfRetests;
+
 
         private double _aroonUp;
         private int _barsToCheck;
         private double _longStopMargin;
         private double _shortStopMargin;
         private double _atrTargetRatio;
+        private double shortPrice;
         private int _atrPeriod = 14;
+        private double rvolTreshold;
         #endregion
 
         #region My Parameters
@@ -72,7 +90,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private int _lotSize1;
         private int _lotSize2;
 
-        private bool _takeTests;
+
         private bool _useLongs = true;
         private bool _useShorts = true;
         private bool _useAroon = true;
@@ -99,6 +117,36 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Calculate = Calculate.OnBarClose;
                 BarsRequiredToTrade = 60;
                 _barsToCheck = 60;
+                lastResetTime = DateTime.MinValue;
+                _numberOfRetests =1;
+                _breakoutValid = false;
+                rvolTreshold = 1.5;
+                _stop = 30;
+                _target1 = 60;
+                _target2 = 90;
+
+
+                DateRanges = new List<DateRange>
+                    {
+                        new DateRange(2024, 3, 11, 2024, 3, 31),
+                        new DateRange(2024, 10, 27, 2024, 11, 3),
+                        new DateRange(2023, 3, 12, 2023, 3, 26),
+                        new DateRange(2023, 10, 29, 2023, 11, 5),
+                        new DateRange(2022, 3, 13, 2022, 3, 27),
+                        new DateRange(2022, 10, 30, 2022, 11, 6),
+                        new DateRange(2021, 3, 14, 2022, 3, 28),
+                        new DateRange(2021, 10, 31, 2022, 11, 7),
+                        new DateRange(2020, 3, 8, 2022, 3, 29),
+                        new DateRange(2020, 10, 25, 2022, 11, 1),
+                        new DateRange(2019, 3, 8, 2022, 3, 31),
+                        new DateRange(2019, 10, 27, 2022, 11, 3),
+                        // Add more ranges as needed
+                    };
+
+                _rthStartTime = 153000;
+                _rthEndTime = 220000;
+                _IbEndTime = 163000;
+                //   
             }
 
 
@@ -113,8 +161,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 BarsRequiredToTrade = BarsToCheck;
                 Levels4 myLevels4 = Levels4();
                 AddChartIndicator(myLevels4);
-                AddDataSeries(BarsPeriodType.Minute, 4);
-                AddDataSeries(BarsPeriodType.Minute, 1);
+
+                AddDataSeries(BarsPeriodType.Minute, 15);
+            //    AddDataSeries(Data.BarsPeriodType.Day, 1);
+                //     AddDataSeries("MNQ 06-24", BarsPeriodType.Minute, 2);
             }
             else if (State == State.DataLoaded)
             {
@@ -124,21 +174,66 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
         }
 
+        private List<DateRange> DateRanges { get; set; }
+
         protected override void OnBarUpdate()
         {
-            if (CurrentBar < BarsRequiredToTrade || CurrentBars[0] < BarsRequiredToTrade || CurrentBars[1] < BarsRequiredToTrade || CurrentBars[2] < BarsRequiredToTrade)
+            if (CurrentBars[0] < BarsRequiredToTrade || CurrentBars[1] < BarsRequiredToTrade)
                 return;
+
+
+            int intDate = ToDay(Time[0]); // Get integer representation of the date
+            bool isSpecialPeriod = DateRanges.Any(range => range.Contains(intDate));
+            _rthStartTime = isSpecialPeriod ? 143000 : 153000;
+            _rthEndTime = isSpecialPeriod ? 210000 : 220000;
+            _IbEndTime = isSpecialPeriod ? 153000 : 163000;
+
+            if (ToTime(Time[0]) == _rthStartTime && (lastResetTime.Date != Time[0].Date))
+            {
+                retestCount = 0;
+                lastResetTime = Time[0];
+            }
+
             CalculateTradeTime();
             //      AdjustStop();
 
+            if (retestCount >= numberOfRetests)
+                return;
 
-            if (Position.MarketPosition == MarketPosition.Flat)
+            if (!_takeTests)
+            {
+                return;
+            }
+
+                if (Position.MarketPosition == MarketPosition.Flat)
             {
                 status = "Flat";
 
             }
+            if (Position.MarketPosition != MarketPosition.Flat)
+            {
+                double entryPrice = Position.AveragePrice;
+                double currentPrice = Close[0];
 
-            int x = 0;
+                // Check if the current close is 10 points above the entry price
+
+                if (currentPrice >= entryPrice + 5)
+                {
+                    // Update stop loss to the entry price
+                    SetStopLoss(CalculationMode.Price, rangeHigh - 1);
+                }
+                if (currentPrice >= entryPrice + 10)
+                {
+                    // Update stop loss to the entry price
+                    SetStopLoss(CalculationMode.Price, entryPrice);
+                }
+                if (currentPrice >= entryPrice + Target1* TickSize)
+                {
+                    // Update stop loss to the entry price
+                    SetStopLoss(CalculationMode.Price, entryPrice + 4);
+                }
+            };
+
 
             if (_canTrade)
             {
@@ -147,10 +242,66 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     double todayGlobexHigh = Levels4().GetTodayGlobexHigh(); // Correctly call the method
                     double todayGlobexLow = Levels4().GetTodayGlobexLow();
-                    if (_takeTests)
+                    double todayIBHigh = Levels4().GetTodayIBHigh(); // Correctly call the method
+                    double todayIBLow = Levels4().GetTodayIBLow();
+                 //   double rvol = ReVOLT(BarsArray[0], 10, 1.35, 0.8).GetRevol();
+                 //   Print("Rvol eee");
+                 //   Print(Time[0]);
+               //     Print(rvol);
+
+                    if (todayGlobexHigh > todayIBHigh)
+                    {
+                        rangeHigh = todayGlobexHigh;
+                    }
+                    else
+                    {
+                        rangeHigh = todayIBHigh;
+                    }
+
+                    if (todayGlobexLow < todayIBLow)
+                    {
+                        rangeLow = todayGlobexLow;
+                    }
+                    else
+                    {
+                        rangeLow = todayIBLow;
+                    }
+
+                    //check if breakout was valid
+                    if (Closes[0][0]>= rangeHigh + (TickSize * breakoutTreshold) && !_breakoutValid && noPositions()) // && rvol > rvolTreshold)
+                    {
+                        int _nr = rnd.Next();
+                        string rando = Convert.ToString(_nr);
+                        string name = "tag " + rando;
+                        _breakoutValid = true;
+                        Draw.ArrowUp(this, name, true, 0, Low[0] - 4 * TickSize, Brushes.Blue);
+                        _longOneOrder = EnterLong(LotSize1, "Long Base");
+                        _longTwoOrder = EnterLong(LotSize2, "Long Runner");
+
+                        //    EnterLongLimit(0, true, 3, longPrice, "Long");
+                    }
+
+                    if (Closes[0][0] <= rangeLow - (TickSize * breakoutTreshold) && !_breakoutValid && noPositions()) // &&  rvol> rvolTreshold)
+                    {
+                        int _nr = rnd.Next();
+                        string rando = Convert.ToString(_nr);
+                        string name = "tag " + rando;
+                        _breakoutValid = true;
+                        Draw.ArrowDown(this, name, true, 0, High[0] + 4 * TickSize, Brushes.Red);
+
+               //         shortPrice = rangeLow - (testTreshold * TickSize);
+               //         EnterShortLimit(0, true, 3, shortPrice, "Short");
+                    }
+                    /*
+                    if (Close[0] - Position.AveragePrice > 10)
+                    {
+                      //  SetStopLoss("Long Runner",CalculationMode.Price, Position.AveragePrice, false);
+                      //  SetStopLoss("Long Base", CalculationMode.Price, Position.AveragePrice, false);
+                    }*/
+
+                    if (_breakoutValid)
                     {
                         Print(ToTime(Time[0]));
-                        atrValue = _atr[0];
                         Print("~~~~");
                         Print("Globex High");
                         Print("~~~~");
@@ -158,23 +309,30 @@ namespace NinjaTrader.NinjaScript.Strategies
                         Print("~~~~");
                         Print("Globex Low");
                         Print(todayGlobexLow);
+                        retestCount++;
+                        _breakoutValid = false;
                     }
-                    //Exits
 
+
+                    //cena high musi sie znalezc powyzej poziomu glboec high o breakTreshold value
+                    // cena potem musi opasc do poziomu minimum glboxHigh plus close trehsold
+                    // rozpoczecie trackowania
+                    // 
                 }
 
                 else if (BarsInProgress == 1) // 4 min
                 {
-
+                    atrValue = _atr[0];
                     // Exits
 
 
                 }
+                /*
                 else if (BarsInProgress == 2) // 1 min
                 {
 
 
-                }
+                }*/
             }
 
 
@@ -187,7 +345,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private void CalculateTradeTime()
         {
 
-            if ((ToTime(Time[0]) >= 153000 && ToTime(Time[0]) < 214000))
+            if ((ToTime(Time[0]) >= _rthStartTime && ToTime(Time[0]) < _rthEndTime))
             {
                 _canTrade = true;
                 _takeTests = true;
@@ -219,36 +377,58 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         protected override void OnOrderUpdate(Order order, double limitPrice, double stopPrice, int quantity, int filled, double averageFillPrice,
 OrderState orderState, DateTime time, ErrorCode error, string comment)
-        { 
+        {
 
-            /*
-            if (OrderFilled(order) && IsLongOrder1(order))
+            
+            if (OrderFilled(order))
             {
-                _longEntryPrice1 = averageFillPrice;
-                stopLossPrice = calculateStopLong();
-                SetStopLoss(CalculationMode.Ticks, 100);
-                //        SetStopLoss(CalculationMode.Price, _longEntryPrice1 - atrValue * 0.6);
-                SetProfitTarget("Long1", CalculationMode.Price, _longEntryPrice1 + atrValue * AtrTargetRatio);
-                status = "Long Default";
+                if (averageFillPrice - rangeHigh > 7)
+                {
+                    SetStopLoss(CalculationMode.Ticks, Stop * 2 * TickSize);
+                }
+                else
+                {
+                    SetStopLoss(CalculationMode.Price, rangeHigh - (Stop * TickSize));
+                }
+
+                if (order == _longOneOrder)
+                {
+                    SetProfitTarget("Long Base",CalculationMode.Price, averageFillPrice + atrValue * Target1);
+                }else if (order == _longTwoOrder)
+                {
+                    //runner
+                    SetProfitTarget("Long Runner", CalculationMode.Price, averageFillPrice + atrValue * Target2);
+                }
+
             }
-
-            else if (OrderFilled(order) && IsShortOrder1(order))
-            {
-                _shortEntryPrice1 = averageFillPrice;
-                stopLossPrice = calculateStopShort();
-                SetStopLoss(CalculationMode.Ticks, 100);
-                //   SetStopLoss(CalculationMode.Price, _shortEntryPrice1 + atrValue * 0.6);
-                SetProfitTarget("Short1", CalculationMode.Price, _shortEntryPrice1 - atrValue * AtrTargetRatio);
-                status = "Short Default";
-            } */
         }
 
         private void AddIndicators()
         {
-            _atr = ATR(BarsArray[0], AtrPeriod);
-            _aroonSlow = Aroon(BarsArray[0], AroonPeriodSlow);
-            AddChartIndicator(_atr);
-            AddChartIndicator(_aroonSlow);
+            _atr = ATR(BarsArray[1], AtrPeriod);
+            //     _aroonSlow = Aroon(BarsArray[0], AroonPeriodSlow);
+            //  AddChartIndicator(_atr);
+            //     AddChartIndicator(_aroonSlow);
+            _rvol = ReVOLT(BarsArray[0], 10, 1.3, 0.8);
+            AddChartIndicator(_rvol);
+        }
+
+        public class DateRange
+        {
+            public int StartDate { get; set; }
+            public int EndDate { get; set; }
+
+            public DateRange(int startYear, int startMonth, int startDay, int endYear, int endMonth, int endDay)
+            {
+                // Format the dates as strings in yyyyMMdd format and then convert to integers
+                StartDate = int.Parse(string.Format("{0}{1:D2}{2:D2}", startYear, startMonth, startDay));
+                EndDate = int.Parse(string.Format("{0}{1:D2}{2:D2}", endYear, endMonth, endDay));
+            }
+
+            public bool Contains(int date)
+            {
+                return date >= StartDate && date <= EndDate;
+            }
         }
 
 
@@ -264,6 +444,19 @@ OrderState orderState, DateTime time, ErrorCode error, string comment)
             set { _numberOfRetests = value; }
         }
 
+        [Display(Name = "Breakout Treshold (ticks)", GroupName = "Test Parameters", Order = 1)]
+        public int breakoutTreshold
+        {
+            get { return _breakoutTreshold; }
+            set { _breakoutTreshold = value; }
+        }
+
+        [Display(Name = "Test Treshold (ticks)", GroupName = "Test Parameters", Order = 1)]
+        public int testTreshold
+        {
+            get { return _testTreshold; }
+            set { _testTreshold = value; }
+        }
 
 
         #endregion
@@ -283,6 +476,43 @@ OrderState orderState, DateTime time, ErrorCode error, string comment)
         {
             get { return _atrTargetRatio; }
             set { _atrTargetRatio = value; }
+        }
+
+        [Display(Name = "Size base", GroupName = "Position Management", Order = 0)]
+        public int LotSize1
+        {
+            get { return _lotSize1; }
+            set { _lotSize1 = value; }
+        }
+        [Display(Name = "Size Runner", GroupName = "Position Management", Order = 0)]
+        public int LotSize2
+        {
+            get { return _lotSize2; }
+            set { _lotSize2 = value; }
+        }
+
+
+        [Display(Name = "Target Base (Ticks)", GroupName = "Position Management", Order = 0)]
+        public int Target1
+        {
+            get { return _target1; }
+            set { _target1 = value; }
+        }
+
+        [Display(Name = "Target Runner (Ticks)", GroupName = "Position Management", Order = 0)]
+        public int Target2
+        {
+            get { return _target2; }
+            set { _target2 = value; }
+        }
+
+
+
+        [Display(Name = "Stop (Ticks)", GroupName = "Position Management", Order = 0)]
+        public int Stop
+        {
+            get { return _stop; }
+            set { _stop = value; }
         }
 
         #endregion
