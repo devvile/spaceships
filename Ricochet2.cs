@@ -24,7 +24,7 @@ using System.ComponentModel;
 
 namespace NinjaTrader.NinjaScript.Strategies
 {
-    public class Ricochet : Strategy
+    public class Ricochet2 : Strategy
     {
         #region declarations
 
@@ -52,6 +52,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private Order _longTwoOrder;
         private Order _shortOneOrder;
         private Indicator _atr;
+        private Indicator _ema;
         private Indicator _stoch;
         private Indicator _aroonSlow;
         private Indicator _aroonMid;
@@ -83,6 +84,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private int _aroonPeriodFast;
         private int _aroonPeriodSlow;
         private double atrValue;
+        private double emaValue;
         private double stopLossPrice;
         private double _shortEntryPrice1;
         private double _longEntryPrice1;
@@ -113,18 +115,18 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (State == State.SetDefaults)
             {
                 Description = @"Retest Tracker";
-                Name = "Ricochet";
+                Name = "Ricochet2";
                 Calculate = Calculate.OnBarClose;
                 BarsRequiredToTrade = 60;
-                _barsToCheck = 60;
                 lastResetTime = DateTime.MinValue;
-                _numberOfRetests = 1;
+                _numberOfRetests =1;
                 _breakoutValid = false;
+                /*
                 rvolTreshold = 1.5;
                 _stop = 30;
                 _target1 = 60;
                 _target2 = 90;
-
+                */
 
                 DateRanges = new List<DateRange>
                     {
@@ -158,16 +160,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Calculate = Calculate.OnBarClose;
 
                 RealtimeErrorHandling = RealtimeErrorHandling.IgnoreAllErrors;
-                BarsRequiredToTrade = BarsToCheck;
-                Levels4 myLevels4 = Levels4();
-                AddChartIndicator(myLevels4);
+                Levels5 myLevels5 = Levels5();
+                AddChartIndicator(myLevels5);
 
                 AddDataSeries(BarsPeriodType.Minute, 15);
-                //    AddDataSeries(Data.BarsPeriodType.Day, 1);
-                //     AddDataSeries("MNQ 06-24", BarsPeriodType.Minute, 2);
             }
             else if (State == State.DataLoaded)
             {
+
                 ClearOutputWindow();
                 AddIndicators();
                 Calculate = Calculate.OnBarClose;
@@ -178,7 +178,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         protected override void OnBarUpdate()
         {
-            if (CurrentBars[0] < BarsRequiredToTrade || CurrentBars[1] < BarsRequiredToTrade)
+            if (CurrentBars[0] < BarsRequiredToTrade || CurrentBars[1] < BarsRequiredToTrade)//   CurrentBars[2] < BarsRequiredToTrade)
                 return;
 
 
@@ -187,22 +187,16 @@ namespace NinjaTrader.NinjaScript.Strategies
             _rthStartTime = isSpecialPeriod ? 143000 : 153000;
             _rthEndTime = isSpecialPeriod ? 210000 : 220000;
             _IbEndTime = isSpecialPeriod ? 153000 : 163000;
-
-            if (ToTime(Time[0]) == _rthStartTime && (lastResetTime.Date != Time[0].Date))
+            CalculateTradeTime();
+            if (ToTime(Time[0]) == _rthStartTime) //&& (lastResetTime.Date != Time[0].Date))
             {
                 retestCount = 0;
                 lastResetTime = Time[0];
+                rangeHigh = Levels5().GetTodayGlobexHigh(); // Initially set rangeHigh to today's Globex high at the start of the session
+                rangeLow = Levels5().GetTodayGlobexLow();
             }
 
-            CalculateTradeTime();
-            Trail();
-            AdjustStop();
 
-            if (ToTime(Time[0]) >= _rthEndTime && Position.MarketPosition == MarketPosition.Long)
-            {
-                ExitLong("Exit Long After RTH", "Long Base");
-                ExitLong("Exit Long After RTH", "Long Runner");
-            };
 
             if (retestCount >= numberOfRetests)
                 return;
@@ -212,30 +206,67 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
             }
 
-            if (Position.MarketPosition == MarketPosition.Flat)
+                if (Position.MarketPosition == MarketPosition.Flat)
             {
                 status = "Flat";
 
             }
-    
+            if (Position.MarketPosition != MarketPosition.Flat)
+            {
+                double entryPrice = Position.AveragePrice;
+                double currentPrice = Closes[0][0];
+
+                // Check if the current close is 10 points above the entry price
+
+                if (currentPrice >= entryPrice + 5)
+                {
+                    // Update stop loss to the entry price
+                    SetStopLoss(CalculationMode.Price, rangeHigh - 1);
+                }
+                if (currentPrice >= entryPrice + 10)
+                {
+                    // Update stop loss to the entry price
+                    SetStopLoss(CalculationMode.Price, entryPrice);
+                }
+                if (currentPrice >= entryPrice + atrValue * Target1)
+                {
+                    // Update stop loss to the entry price
+                    SetStopLoss(CalculationMode.Price, entryPrice + 4);
+                }
+            };
+
 
             if (_canTrade)
             {
 
                 if (BarsInProgress == 0)
                 {
-
-
-
+                    /*
                     double todayGlobexHigh = Levels4().GetTodayGlobexHigh(); // Correctly call the method
                     double todayGlobexLow = Levels4().GetTodayGlobexLow();
                     double todayIBHigh = Levels4().GetTodayIBHigh(); // Correctly call the method
                     double todayIBLow = Levels4().GetTodayIBLow();
-                    //   double rvol = ReVOLT(BarsArray[0], 10, 1.35, 0.8).GetRevol();
+                 //   double rvol = ReVOLT(BarsArray[0], 10, 1.35, 0.8).GetRevol();
+                    */
                     //   Print("Rvol eee");
                     //   Print(Time[0]);
                     //     Print(rvol);
 
+                    if (Position.MarketPosition != MarketPosition.Flat && ToTime(Time[0]) >= _rthEndTime)
+                    { 
+                        ExitLong();
+                    }
+
+                    if (Highs[0][4] > rangeHigh && noPositions())
+                    {
+                        rangeHigh = Highs[0][4];
+                    }
+                    if (Lows[0][4] < rangeLow && noPositions())
+                    {
+                        rangeLow = Lows[0][4];
+                    }
+
+                    /*
                     if (todayGlobexHigh > todayIBHigh)
                     {
                         rangeHigh = todayGlobexHigh;
@@ -252,10 +283,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                     else
                     {
                         rangeLow = todayIBLow;
-                    }
+                    }*/
 
                     //check if breakout was valid
-                    if (Closes[0][0] >= rangeHigh + (TickSize * breakoutTreshold) && !_breakoutValid && noPositions()) // && rvol > rvolTreshold)
+                    if (Closes[0][0]>= rangeHigh + (TickSize * breakoutTreshold) && !_breakoutValid && noPositions())// && Closes[0][0] > emaValue)
                     {
                         int _nr = rnd.Next();
                         string rando = Convert.ToString(_nr);
@@ -276,8 +307,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                         _breakoutValid = true;
                         Draw.ArrowDown(this, name, true, 0, High[0] + 4 * TickSize, Brushes.Red);
 
-                        //         shortPrice = rangeLow - (testTreshold * TickSize);
-                        //         EnterShortLimit(0, true, 3, shortPrice, "Short");
+               //         shortPrice = rangeLow - (testTreshold * TickSize);
+               //         EnterShortLimit(0, true, 3, shortPrice, "Short");
                     }
                     /*
                     if (Close[0] - Position.AveragePrice > 10)
@@ -288,14 +319,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                     if (_breakoutValid)
                     {
-                        Print(ToTime(Time[0]));
-                        Print("~~~~");
-                        Print("Globex High");
-                        Print("~~~~");
-                        Print(todayGlobexHigh);
-                        Print("~~~~");
-                        Print("Globex Low");
-                        Print(todayGlobexLow);
                         retestCount++;
                         _breakoutValid = false;
                     }
@@ -307,9 +330,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                     // 
                 }
 
-                else if (BarsInProgress == 1) // 4 min
+                else if (BarsInProgress == 1) // 15 min
                 {
                     atrValue = _atr[0];
+                    emaValue = _ema[0];
                     // Exits
 
 
@@ -328,70 +352,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         // zaimplementowac czasy Ziomy i letni dla usa dla RTH i dla LEVELS
 
-        private void Trail()
-        {
-            double entryPrice = Position.AveragePrice;
-            double currentPrice = Closes[0][0];
-            if (currentPrice >= entryPrice + 5 && Position.MarketPosition == MarketPosition.Long && status != "Breakeven")
-            {
-                status = "Level";
-            }
-            else if (currentPrice >= entryPrice + 10 && Position.MarketPosition == MarketPosition.Long && status != "Trail2")
-            {
-                status = "Breakeven";
-            }
-            else if (currentPrice >= entryPrice + atrValue * Target1 && Position.MarketPosition == MarketPosition.Long)
-            {
-                status = "Trail2";
-            }
-
-        }
-
-        private void AdjustStop()
-        {
-            double entryPrice = Position.AveragePrice;
-            if (noPositions())
-            {
-                status = "Flat";
-                SetStopLoss(CalculationMode.Ticks, 50);
-            }
-            else if (status == "Level")
-            {
-                SetStopLoss(CalculationMode.Price, rangeHigh - 1);
-            }
-            else if (status == "Breakeven")
-            {
-                SetStopLoss(CalculationMode.Price, entryPrice);
-            }
-            else if (status == "Trail2")
-            {
-                SetStopLoss(CalculationMode.Price, entryPrice + 4);
-            }
-        }
-        /*
-if (Position.MarketPosition != MarketPosition.Flat)
-{
-
-
-    // Check if the current close is 10 points above the entry price
-
-    if (currentPrice >= entryPrice + 5)
-    {
-        // Update stop loss to the entry price
-        SetStopLoss(CalculationMode.Price, rangeHigh - 1);
-    }
-    if (currentPrice >= entryPrice + 10)
-    {
-        // Update stop loss to the entry price
-        SetStopLoss(CalculationMode.Price, entryPrice);
-    }
-    if (currentPrice >= entryPrice + atrValue * Target1)
-    {
-        // Update stop loss to the entry price
-        SetStopLoss(CalculationMode.Price, entryPrice + 4);
-    }
-};
-*/
 
         private void CalculateTradeTime()
         {
@@ -415,6 +375,10 @@ if (Position.MarketPosition != MarketPosition.Flat)
             return Position.MarketPosition == MarketPosition.Flat;
         }
 
+        private void AdjustStop()
+        {
+
+        }
 
 
         private bool OrderFilled(Order order)
@@ -426,10 +390,11 @@ if (Position.MarketPosition != MarketPosition.Flat)
 OrderState orderState, DateTime time, ErrorCode error, string comment)
         {
 
-
+            
             if (OrderFilled(order))
             {
                 if (averageFillPrice - rangeHigh > 7)
+          //      if (averageFillPrice - rangeHigh > atrValue * 1.5 )
                 {
                     SetStopLoss(CalculationMode.Ticks, Stop * 2 * TickSize);
                 }
@@ -440,9 +405,8 @@ OrderState orderState, DateTime time, ErrorCode error, string comment)
 
                 if (order == _longOneOrder)
                 {
-                    SetProfitTarget("Long Base", CalculationMode.Price, averageFillPrice + atrValue * Target1);
-                }
-                else if (order == _longTwoOrder)
+                    SetProfitTarget("Long Base",CalculationMode.Price, averageFillPrice + atrValue * Target1);
+                }else if (order == _longTwoOrder)
                 {
                     //runner
                     SetProfitTarget("Long Runner", CalculationMode.Price, averageFillPrice + atrValue * Target2);
@@ -454,6 +418,7 @@ OrderState orderState, DateTime time, ErrorCode error, string comment)
         private void AddIndicators()
         {
             _atr = ATR(BarsArray[1], AtrPeriod);
+            _ema = ATR(BarsArray[1], 14);
             //     _aroonSlow = Aroon(BarsArray[0], AroonPeriodSlow);
             //  AddChartIndicator(_atr);
             //     AddChartIndicator(_aroonSlow);
@@ -511,12 +476,7 @@ OrderState orderState, DateTime time, ErrorCode error, string comment)
 
         #region Position Management
 
-        [Display(Name = "Bars to Check", GroupName = "Position Management", Order = 0)]
-        public int BarsToCheck
-        {
-            get { return _barsToCheck; }
-            set { _barsToCheck = value; }
-        }
+
 
 
         [Display(Name = "Atr Target ratio", GroupName = "Position Management", Order = 0)]
@@ -606,35 +566,6 @@ OrderState orderState, DateTime time, ErrorCode error, string comment)
 
 
         #endregion
-
-        /*
-
-
-#region Longs
-
-[Display(Name = "Long Stop Margin", GroupName = "LONGS", Order = 0)]
-public double LongStopMargin
-{
-    get { return _longStopMargin; }
-    set { _longStopMargin = value; }
-}
-
-
-#endregion
-
-#region Shorts
-
-[Display(Name = "Short Stop Margin", GroupName = "SHORTS", Order = 0)]
-public double ShortStopMargin
-{
-    get { return _shortStopMargin; }
-    set { _shortStopMargin = value; }
-}
-
-#endregion
-
-
-*/
 
         #endregion
 
