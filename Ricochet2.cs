@@ -184,7 +184,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             int intDate = ToDay(Time[0]); // Get integer representation of the date
             bool isSpecialPeriod = DateRanges.Any(range => range.Contains(intDate));
-            _rthStartTime = isSpecialPeriod ? 143000 : 153000;
+            _rthStartTime = isSpecialPeriod ? 153000 : 163000;
             _rthEndTime = isSpecialPeriod ? 210000 : 220000;
             _IbEndTime = isSpecialPeriod ? 153000 : 163000;
             CalculateTradeTime();
@@ -500,14 +500,14 @@ OrderState orderState, DateTime time, ErrorCode error, string comment)
         }
 
 
-        [Display(Name = "Target Base (Ticks)", GroupName = "Position Management", Order = 0)]
+        [Display(Name = "Target Base (atr ratio)", GroupName = "Position Management", Order = 0)]
         public int Target1
         {
             get { return _target1; }
             set { _target1 = value; }
         }
 
-        [Display(Name = "Target Runner (Ticks)", GroupName = "Position Management", Order = 0)]
+        [Display(Name = "Target Runner (atr ratio)", GroupName = "Position Management", Order = 0)]
         public int Target2
         {
             get { return _target2; }

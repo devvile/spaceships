@@ -32,6 +32,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private Indicator _levels;
         private Indicator _aroonFast;
         private Indicator _rvol;
+        private Indicator _kama;
         private int _numberOfRetests;
         private int _testTreshold;
         private int _breakoutTreshold;
@@ -121,9 +122,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 _numberOfRetests = 1;
                 _breakoutValid = false;
                 rvolTreshold = 1.5;
-                _stop = 30;
-                _target1 = 60;
-                _target2 = 90;
+                _stop = 12;
+                _target1 = 4;
+                _target2 = 10;
 
 
                 DateRanges = new List<DateRange>
@@ -142,11 +143,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                         new DateRange(2019, 10, 27, 2022, 11, 3),
                         // Add more ranges as needed
                     };
-
-                _rthStartTime = 153000;
-                _rthEndTime = 220000;
-                _IbEndTime = 163000;
-                //   
             }
 
 
@@ -163,8 +159,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                 AddChartIndicator(myLevels4);
 
                 AddDataSeries(BarsPeriodType.Minute, 15);
-                //    AddDataSeries(Data.BarsPeriodType.Day, 1);
-                //     AddDataSeries("MNQ 06-24", BarsPeriodType.Minute, 2);
             }
             else if (State == State.DataLoaded)
             {
@@ -195,8 +189,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
 
             CalculateTradeTime();
-            Trail();
-            AdjustStop();
+
 
             if (ToTime(Time[0]) >= _rthEndTime && Position.MarketPosition == MarketPosition.Long)
             {
@@ -212,11 +205,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
             }
 
-            if (Position.MarketPosition == MarketPosition.Flat)
-            {
-                status = "Flat";
 
-            }
     
 
             if (_canTrade)
@@ -226,17 +215,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
 
 
-
                     double todayGlobexHigh = Levels4().GetTodayGlobexHigh(); // Correctly call the method
                     double todayGlobexLow = Levels4().GetTodayGlobexLow();
                     double todayIBHigh = Levels4().GetTodayIBHigh(); // Correctly call the method
                     double todayIBLow = Levels4().GetTodayIBLow();
                     //   double rvol = ReVOLT(BarsArray[0], 10, 1.35, 0.8).GetRevol();
-                    //   Print("Rvol eee");
-                    //   Print(Time[0]);
-                    //     Print(rvol);
 
-                    if (todayGlobexHigh > todayIBHigh)
+
+                    if (todayGlobexHigh > todayIBHigh && noPositions())
                     {
                         rangeHigh = todayGlobexHigh;
                     }
@@ -245,7 +231,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         rangeHigh = todayIBHigh;
                     }
 
-                    if (todayGlobexLow < todayIBLow)
+                    if (todayGlobexLow < todayIBLow && noPositions())
                     {
                         rangeLow = todayGlobexLow;
                     }
@@ -276,35 +262,25 @@ namespace NinjaTrader.NinjaScript.Strategies
                         _breakoutValid = true;
                         Draw.ArrowDown(this, name, true, 0, High[0] + 4 * TickSize, Brushes.Red);
 
-                        //         shortPrice = rangeLow - (testTreshold * TickSize);
-                        //         EnterShortLimit(0, true, 3, shortPrice, "Short");
                     }
-                    /*
-                    if (Close[0] - Position.AveragePrice > 10)
+                    if (Position.MarketPosition == MarketPosition.Flat)
                     {
-                      //  SetStopLoss("Long Runner",CalculationMode.Price, Position.AveragePrice, false);
-                      //  SetStopLoss("Long Base", CalculationMode.Price, Position.AveragePrice, false);
-                    }*/
+                        status = "Flat";
+
+                    }
+
+
+                    Trail();
+                    AdjustStop();
 
                     if (_breakoutValid)
                     {
-                        Print(ToTime(Time[0]));
-                        Print("~~~~");
-                        Print("Globex High");
-                        Print("~~~~");
-                        Print(todayGlobexHigh);
-                        Print("~~~~");
-                        Print("Globex Low");
-                        Print(todayGlobexLow);
                         retestCount++;
                         _breakoutValid = false;
                     }
 
 
-                    //cena high musi sie znalezc powyzej poziomu glboec high o breakTreshold value
-                    // cena potem musi opasc do poziomu minimum glboxHigh plus close trehsold
-                    // rozpoczecie trackowania
-                    // 
+
                 }
 
                 else if (BarsInProgress == 1) // 4 min
@@ -314,12 +290,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 
                 }
-                /*
-                else if (BarsInProgress == 2) // 1 min
-                {
-
-
-                }*/
             }
 
 
@@ -331,16 +301,18 @@ namespace NinjaTrader.NinjaScript.Strategies
         private void Trail()
         {
             double entryPrice = Position.AveragePrice;
-            double currentPrice = Closes[0][0];
-            if (currentPrice >= entryPrice + 5 && Position.MarketPosition == MarketPosition.Long && status != "Breakeven")
+            double currentPrice = Close[0];
+            if (Close[0] >= entryPrice + atrValue * 0.75 && Position.MarketPosition == MarketPosition.Long  && status != "Breakeven"&& status != "Trail2")
             {
                 status = "Level";
+                Print("Levels");
             }
-            else if (currentPrice >= entryPrice + 10 && Position.MarketPosition == MarketPosition.Long && status != "Trail2")
+            if (Close[0] >= entryPrice + atrValue * 1.5 && Position.MarketPosition == MarketPosition.Long && BarsSinceEntryExecution() > 1 && status == "Level")
             {
                 status = "Breakeven";
+                Print("BREJK IVAN");
             }
-            else if (currentPrice >= entryPrice + atrValue * Target1 && Position.MarketPosition == MarketPosition.Long)
+            else if (Close[0] > entryPrice + atrValue * Target1 && Position.MarketPosition == MarketPosition.Long && status == "Breakeven" && status != "Flat")
             {
                 status = "Trail2";
             }
@@ -353,7 +325,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (noPositions())
             {
                 status = "Flat";
-                SetStopLoss(CalculationMode.Ticks, 50);
+           //     SetStopLoss(CalculationMode.Ticks, 50);
             }
             else if (status == "Level")
             {
@@ -361,42 +333,18 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             else if (status == "Breakeven")
             {
-                SetStopLoss(CalculationMode.Price, entryPrice);
+                SetStopLoss(CalculationMode.Price, entryPrice + atrValue*0.75);
             }
             else if (status == "Trail2")
             {
-                SetStopLoss(CalculationMode.Price, entryPrice + 4);
+                SetStopLoss(CalculationMode.Price, _kama[0]);
             }
         }
-        /*
-if (Position.MarketPosition != MarketPosition.Flat)
-{
-
-
-    // Check if the current close is 10 points above the entry price
-
-    if (currentPrice >= entryPrice + 5)
-    {
-        // Update stop loss to the entry price
-        SetStopLoss(CalculationMode.Price, rangeHigh - 1);
-    }
-    if (currentPrice >= entryPrice + 10)
-    {
-        // Update stop loss to the entry price
-        SetStopLoss(CalculationMode.Price, entryPrice);
-    }
-    if (currentPrice >= entryPrice + atrValue * Target1)
-    {
-        // Update stop loss to the entry price
-        SetStopLoss(CalculationMode.Price, entryPrice + 4);
-    }
-};
-*/
 
         private void CalculateTradeTime()
         {
 
-            if ((ToTime(Time[0]) >= _rthStartTime && ToTime(Time[0]) < _rthEndTime - 15))
+            if ((ToTime(Time[0]) >= _rthStartTime && ToTime(Time[0]) < _rthEndTime - 10000))
             {
                 _canTrade = true;
                 _takeTests = true;
@@ -429,7 +377,7 @@ OrderState orderState, DateTime time, ErrorCode error, string comment)
 
             if (OrderFilled(order))
             {
-                if (averageFillPrice - rangeHigh > 7)
+                if (averageFillPrice - rangeHigh > 8)
                 {
                     SetStopLoss(CalculationMode.Ticks, Stop * 2 * TickSize);
                 }
@@ -454,11 +402,13 @@ OrderState orderState, DateTime time, ErrorCode error, string comment)
         private void AddIndicators()
         {
             _atr = ATR(BarsArray[1], AtrPeriod);
+            _kama = KAMA(BarsArray[0], 10,14,30);
             //     _aroonSlow = Aroon(BarsArray[0], AroonPeriodSlow);
             //  AddChartIndicator(_atr);
             //     AddChartIndicator(_aroonSlow);
             _rvol = ReVOLT(BarsArray[0], 10, 1.3, 0.8);
             AddChartIndicator(_rvol);
+            AddChartIndicator(_kama);
         }
 
         public class DateRange
@@ -540,14 +490,14 @@ OrderState orderState, DateTime time, ErrorCode error, string comment)
         }
 
 
-        [Display(Name = "Target Base (Ticks)", GroupName = "Position Management", Order = 0)]
+        [Display(Name = "Target Base (atr ratio)", GroupName = "Position Management", Order = 0)]
         public int Target1
         {
             get { return _target1; }
             set { _target1 = value; }
         }
 
-        [Display(Name = "Target Runner (Ticks)", GroupName = "Position Management", Order = 0)]
+        [Display(Name = "Target Runner (atr ratio)", GroupName = "Position Management", Order = 0)]
         public int Target2
         {
             get { return _target2; }
