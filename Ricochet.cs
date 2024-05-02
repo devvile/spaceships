@@ -268,10 +268,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                         status = "Flat";
 
                     }
+                    else
+                    {
 
-
-                    Trail();
-                    AdjustStop();
+                        Trail();
+                        AdjustStop();
+                    }
 
                     if (_breakoutValid)
                     {
@@ -302,6 +304,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             double entryPrice = Position.AveragePrice;
             double currentPrice = Close[0];
+            Print(status);
             if (Close[0] >= entryPrice + atrValue * 0.75 && Position.MarketPosition == MarketPosition.Long  && status != "Breakeven"&& status != "Trail2")
             {
                 status = "Level";
