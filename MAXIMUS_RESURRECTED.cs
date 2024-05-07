@@ -27,40 +27,37 @@ namespace NinjaTrader.NinjaScript.Strategies
     public class Maximus_Resurrected : Strategy
     {
         #region declarations
-
         private Indicator _aroon;
         private Indicator _momentum1;
         private Indicator _momentum2;
-
-
         private double _momentum1TriggerValue;
         private double _momentum2TriggerValue;
         private bool _canTrade;
-
-        int _rthStartTime;
-        int _rthEndTime;
-        int _IbEndTime;
-        Random rnd = new Random();
+        private int _rthStartTime;
+        private int _rthEndTime;
+        private int _ibEndTime;
+        private Random _rnd = new Random();
+        private List<DateRange> _dateRanges;
+        private bool _signalModeActive;
+        private CandleColor _signalModeColor;
         #endregion
 
 
         #region My Parameters
 
         #region Momentum
-
-        [Display(Name = "Momentum 1 Trigger (EMA)", GroupName = "Aroon", Order = 0)]
-        public double Momentum1
+        [Display(Name = "Momentum 1 Trigger (EMA)", GroupName = "Momentum", Order = 0)]
+        public double Momentum1TriggerValue
         {
             get { return _momentum1TriggerValue; }
-            set { _momentum1TriggerValue = value; }
+            set {_momentum1TriggerValue = value;}
         }
 
-
-        [Display(Name = "Momentum 2 Trigger (BB)", GroupName = "Aroon", Order = 0)]
+        [Display(Name = "Momentum 2 Trigger (BB)", GroupName = "Momentum", Order = 1)]
         public double Momentum2TriggerValue
         {
-            get { return _momentum2TriggerValue; }
-            set { _momentum2TriggerValue = value; }
+            get  {return   _momentum2TriggerValue; }
+            set  { _momentum2TriggerValue = value; }
         }
 
 
@@ -69,140 +66,154 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 
         #endregion
-
-
-
-
-        // Momentum trigger
-        // Momentum trigger 2
-
-        // aroon Uptrend > 70 i donw ponizej 70
-        // aroon downtrend < 70 i up pow 70
-
-        // pullback / candle trigger (jesli zmienia kolor na czerwony
 
 
         protected override void OnStateChange()
         {
-
             if (State == State.SetDefaults)
             {
-                Description = @"Sandbox";
+                Description = "Maximus Resurrected Strategy";
                 Name = "Maximus Resurrected";
                 Calculate = Calculate.OnBarClose;
                 BarsRequiredToTrade = 60;
-
             }
-
             else if (State == State.Configure)
             {
-                ClearOutputWindow();
+                ConfigureDateRanges();
                 EntryHandling = EntryHandling.AllEntries;
                 EntriesPerDirection = 6;
-                Calculate = Calculate.OnBarClose;
-                RealtimeErrorHandling = RealtimeErrorHandling.IgnoreAllErrors;
-
-                DateRanges = new List<DateRange>
-                    {
-                        new DateRange(2024, 3, 11, 2024, 3, 31),
-                        new DateRange(2024, 10, 27, 2024, 11, 3),
-                        new DateRange(2023, 3, 12, 2023, 3, 26),
-                        new DateRange(2023, 10, 29, 2023, 11, 5),
-                        new DateRange(2022, 3, 13, 2022, 3, 27),
-                        new DateRange(2022, 10, 30, 2022, 11, 6),
-                        new DateRange(2021, 3, 14, 2022, 3, 28),
-                        new DateRange(2021, 10, 31, 2022, 11, 7),
-                        new DateRange(2020, 3, 8, 2022, 3, 29),
-                        new DateRange(2020, 10, 25, 2022, 11, 1),
-                        new DateRange(2019, 3, 8, 2022, 3, 31),
-                        new DateRange(2019, 10, 27, 2022, 11, 3),
-                        // Add more ranges as needed
-                    };
             }
             else if (State == State.DataLoaded)
             {
-                ClearOutputWindow();
                 AddIndicators();
-                Calculate = Calculate.OnBarClose;
             }
         }
-        private List<DateRange> DateRanges { get; set; }
+
+        private void ConfigureDateRanges()
+        {
+            _dateRanges = new List<DateRange>
+            {
+                new DateRange(2024, 3, 11, 2024, 3, 31),
+                new DateRange(2024, 10, 27, 2024, 11, 3),
+                new DateRange(2023, 3, 12, 2023, 3, 26),
+                new DateRange(2023, 10, 29, 2023, 11, 5),
+                new DateRange(2022, 3, 13, 2022, 3, 27),
+                new DateRange(2022, 10, 30, 2022, 11, 6),
+                new DateRange(2021, 3, 14, 2022, 3, 28),
+                new DateRange(2021, 10, 31, 2022, 11, 7),
+                new DateRange(2020, 3, 8, 2022, 3, 29),
+                new DateRange(2020, 10, 25, 2022, 11, 1),
+                new DateRange(2019, 3, 8, 2022, 3, 31),
+                new DateRange(2019, 10, 27, 2022, 11, 3),
+                // Add more ranges as needed
+            };
+        }
 
         protected override void OnBarUpdate()
         {
-            if (CurrentBar < BarsRequiredToTrade)
-                return;
+            if (CurrentBar < BarsRequiredToTrade) return;
 
-  
-            int intDate = ToDay(Time[0]); // Get integer representation of the date
-            bool isSpecialPeriod = DateRanges.Any(range => range.Contains(intDate));
-            _rthStartTime = isSpecialPeriod ? 143000 : 153000;
-            _rthEndTime = isSpecialPeriod ? 210000 : 220000;
-            _IbEndTime = isSpecialPeriod ? 153000 : 163000;
-
-            CalculateTradeTime();
+            CheckTradingWindow();
             if (_canTrade)
             {
-                if (AroonUp() && lastCandleRed() && _momentum1[0] >= _momentum1TriggerValue && _momentum2[0] >= _momentum2TriggerValue)
+                CandleColor currentCandleColor = Close[0] > Open[0] ? CandleColor.Green : CandleColor.Red;
+                bool lastCandleColorChange = LastCandleColorChange(currentCandleColor);
+
+                // If last candle color change is detected, activate the signal mode.
+                if (lastCandleColorChange)
                 {
-                    int _nr = rnd.Next();
-                    string rando = Convert.ToString(_nr);
-                    string name = "tag " + rando;
-                    Draw.ArrowUp(this, name, true, 0, Low[0] - 4 * TickSize, Brushes.Blue);
+                    _signalModeActive = true;
+                    _signalModeColor = currentCandleColor;
                 }
-                 if (AroonDown()&& lastCandleGreen() && _momentum1[0] <= _momentum1TriggerValue * -1 && _momentum2[0] <= _momentum2TriggerValue * -1)
+                else if (currentCandleColor == _signalModeColor)
                 {
-                    int _nr = rnd.Next();
-                    string rando = Convert.ToString(_nr);
-                    string name = "tag " + rando;
-                    Draw.ArrowDown(this, name, true, 0, High[0] + 4 * TickSize, Brushes.Red);
+                    // Continue to signal if subsequent candles are of the same color and signal mode is active
+                    _signalModeActive = true;
+                }
+                else
+                {
+                    _signalModeActive = false;
+                }
+
+                if (_signalModeActive)
+                {
+                    ProcessTradeConditions(currentCandleColor);
                 }
             }
+        }
 
+        private void CheckTradingWindow()
+        {
+            int intDate = ToDay(Time[0]);
+            bool isSpecialPeriod = _dateRanges.Any(range => range.Contains(intDate));
+            _rthStartTime = isSpecialPeriod ? 143000 : 153000;
+            _rthEndTime = isSpecialPeriod ? 210000 : 220000;
+            _ibEndTime = isSpecialPeriod ? 153000 : 163000;
+
+            int currentTime = ToTime(Time[0]);
+            _canTrade = currentTime >= _rthStartTime && currentTime < _rthEndTime;
         }
 
 
-
-        private bool AroonUp()
+        private int CheckLongConditions()
         {
-            return (Aroon(15).Up[0] > 70 && Aroon(15).Down[0] < 30);
+            bool condition1 = Aroon(15).Up[0] > 70 && Aroon(15).Down[0] < 30;
+            bool condition2 = _momentum1[0] >= _momentum1TriggerValue;
+            bool condition3 = _momentum2[0] >= _momentum2TriggerValue;
+            return (condition1 ? 1 : 0) + (condition2 ? 1 : 0) + (condition3 ? 1 : 0);
         }
 
-        private bool AroonDown()
+        private int CheckShortConditions()
         {
-            return (Aroon(15).Down[0] > 70 && Aroon(15).Up[0] < 30);
+            bool condition1 = Aroon(15).Down[0] > 70 && Aroon(15).Up[0] < 30;
+            bool condition2 = _momentum1[0] <= -_momentum1TriggerValue;
+            bool condition3 = _momentum2[0] <= -_momentum2TriggerValue;
+            return (condition1 ? 1 : 0) + (condition2 ? 1 : 0) + (condition3 ? 1 : 0);
         }
 
- 
-        private bool lastCandleRed()
+        private enum CandleColor
         {
-            bool isCurrentRed = Close[0] < Open[0];
-            bool isPreviousGreen = Close[1] > Open[1];
-
-            return isCurrentRed && isPreviousGreen;
-        }
-
-        private bool lastCandleGreen()
-        {
-            bool isCurrentGreen = Close[0] > Open[0];
-            bool isPreviousRed = Close[1] < Open[1];
-
-            return isCurrentGreen && isPreviousRed;
+            Red,
+            Green
         }
 
 
-
-        private void CalculateTradeTime()
+        private void ProcessTradeConditions(CandleColor currentCandleColor)
         {
+            int conditionsMetLong = CheckLongConditions();
+            int conditionsMetShort = CheckShortConditions();
 
-            if ((ToTime(Time[0]) >= _rthStartTime && ToTime(Time[0]) < _rthEndTime))
+            ExecuteTrades(conditionsMetLong, conditionsMetShort, currentCandleColor);
+        }
+
+        private bool LastCandleColorChange(CandleColor targetColor)
+        {
+            bool isCurrentCandleTargetColor = (targetColor == CandleColor.Green) ? Close[0] > Open[0] : Close[0] < Open[0];
+            bool isPreviousCandleOppositeColor = (targetColor == CandleColor.Green) ? Close[1] < Open[1] : Close[1] > Open[1];
+
+            return isCurrentCandleTargetColor && isPreviousCandleOppositeColor;
+        }
+
+        private void ExecuteTrades(int conditionsMetLong, int conditionsMetShort, CandleColor currentCandleColor)
+        {
+            if (currentCandleColor == CandleColor.Red && conditionsMetLong >= 2)
             {
-                _canTrade = true;
+                DrawSignal("Long", Low[0] - 4 * TickSize, Brushes.Blue);
             }
+            if (currentCandleColor == CandleColor.Green &&  conditionsMetShort >= 2)
+            {
+                DrawSignal("Short", High[0] + 4 * TickSize, Brushes.Red);
+            }
+        }
+
+        private void DrawSignal(string direction, double price, Brush color)
+        {
+            int randomNumber = _rnd.Next();
+            string tag = "tag" + randomNumber;
+            if (direction == "Long")
+                Draw.ArrowUp(this, tag, true, 0, price, color);
             else
-            {
-                _canTrade = false;
-            }
+                Draw.ArrowDown(this, tag, true, 0, price, color);
         }
 
 
@@ -211,7 +222,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             _aroon = Aroon(15);
             _momentum1 = Momentum(EMA(10),5);
             _momentum2 = Momentum(Bollinger(2,14).Middle, 5);
-            AddChartIndicator(_aroon);
+        //    AddChartIndicator(_aroon);
         }
 
         public class DateRange

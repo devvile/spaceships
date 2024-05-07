@@ -24,7 +24,7 @@ using System.ComponentModel;
 
 namespace NinjaTrader.NinjaScript.Strategies
 {
-    public class Ricochet : Strategy
+    public class MeanRev : Strategy
     {
         #region declarations
 
@@ -35,7 +35,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private Indicator _kama;
         private int _numberOfRetests;
         private int _testTreshold;
-        private int _breakoutTreshold;
+        private int _entryTreshold;
         private int retestCount;
         private DateTime lastResetTime;
         private bool _takeTests;
@@ -48,10 +48,12 @@ namespace NinjaTrader.NinjaScript.Strategies
         public int _stop;
         public int _target1;
         public int _target2;
+        public bool testValid;
 
         private Order _longOneOrder;
         private Order _longTwoOrder;
         private Order _shortOneOrder;
+        private Order _shortTwoOrder;
         private Indicator _atr;
         private Indicator _stoch;
         private Indicator _aroonSlow;
@@ -114,7 +116,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (State == State.SetDefaults)
             {
                 Description = @"Retest Tracker";
-                Name = "Ricochet";
+                Name = "MeanRev";
                 Calculate = Calculate.OnBarClose;
                 BarsRequiredToTrade = 60;
                 _barsToCheck = 60;
@@ -206,7 +208,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
 
 
-    
+
 
             if (_canTrade)
             {
@@ -222,64 +224,85 @@ namespace NinjaTrader.NinjaScript.Strategies
                     //   double rvol = ReVOLT(BarsArray[0], 10, 1.35, 0.8).GetRevol();
 
 
-                    if (todayGlobexHigh > todayIBHigh && noPositions())
-                    {
                         rangeHigh = todayGlobexHigh;
-                    }
-                    else
-                    {
-                        rangeHigh = todayIBHigh;
-                    }
 
-                    if (todayGlobexLow < todayIBLow && noPositions())
-                    {
                         rangeLow = todayGlobexLow;
-                    }
-                    else
-                    {
-                        rangeLow = todayIBLow;
-                    }
+                    
+          
 
                     //check if breakout was valid
-                    if (Closes[0][0] >= rangeHigh + (TickSize * breakoutTreshold) && !_breakoutValid && noPositions() && rangeHigh-todayGlobexHigh < 25) // && rvol > rvolTreshold)
+                    if (Closes[0][0] <= rangeLow + (TickSize * entryTreshold) && noPositions() && rangeValid()) // && rvol > rvolTreshold)
                     {
                         int _nr = rnd.Next();
                         string rando = Convert.ToString(_nr);
                         string name = "tag " + rando;
-                        _breakoutValid = true;
                         Draw.ArrowUp(this, name, true, 0, Low[0] - 4 * TickSize, Brushes.Blue);
                         _longOneOrder = EnterLong(LotSize1, "Long Base");
-                        _longTwoOrder = EnterLong(LotSize2, "Long Runner");
+                   //     _longTwoOrder = EnterLong(LotSize2, "Long Runner");
+                    //    retestCount++;
 
-                        //    EnterLongLimit(0, true, 3, longPrice, "Long");
                     }
 
-                    if (Closes[0][0] <= rangeLow - (TickSize * breakoutTreshold) && !_breakoutValid && noPositions()) // &&  rvol> rvolTreshold)
+                    if (Closes[0][0] >= rangeHigh - (TickSize * entryTreshold)  && noPositions() && rangeValid()) // &&  rvol> rvolTreshold)
                     {
                         int _nr = rnd.Next();
                         string rando = Convert.ToString(_nr);
                         string name = "tag " + rando;
-                        _breakoutValid = true;
                         Draw.ArrowDown(this, name, true, 0, High[0] + 4 * TickSize, Brushes.Red);
-
+                        _shortOneOrder = EnterShort(LotSize1, "Short Base");
+                   //     _shortTwoOrder = EnterShort(LotSize2, "Short Runner");
+                  //      retestCount++;
 
                     }
 
                     if (Position.MarketPosition == MarketPosition.Flat)
                     {
                         status = "Flat";
+                        testValid = false;
 
                     }
+                    if (Position.MarketPosition != MarketPosition.Flat)
+                    {
+                        double priceMovementThreshold = TickSize * entryTreshold;
+                        double entryPrice = Position.AveragePrice;
 
-                        Trail();
-                        AdjustStop();
+                        // Long position - checking for downward movement and then a close below the entry1 price
+                        if (Position.MarketPosition == MarketPosition.Long && Close[0] < rangeLow - priceMovementThreshold)
+                        {
+                            testValid = true;
+                        }
+                        if (Close[0] > rangeLow + (priceMovementThreshold +1) && testValid && status != "runner" && Position.MarketPosition == MarketPosition.Long)  // Close below entry1 price
+                        {
+                            _longTwoOrder = EnterLong(LotSize2, "Long Runner");
+                            retestCount++;
+                            status = "runner";
+                        }
+                    
+                            // Short position - checking for upward movement and then a close above the entry1 price
+                            if (Position.MarketPosition == MarketPosition.Short && Close[0] > rangeHigh + priceMovementThreshold)
+                            {
+                                testValid = true; 
+                            }
 
+                            if (Close[0] < rangeHigh - (priceMovementThreshold +1) && testValid && status!= "runner" && Position.MarketPosition == MarketPosition.Short) // Close above entry1 price
+                            {
+                                _shortTwoOrder = EnterShort(LotSize2, "Short Runner");
+                                retestCount++;
+                                 status = "runner";
+                            }
+                    }
+                    /*
+                    Trail();
+                    AdjustStop();
+                    */
+
+                    /*
                     if (_breakoutValid)
                     {
                         retestCount++;
                         _breakoutValid = false;
                     }
-
+                    */
 
 
                 }
@@ -294,6 +317,11 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
 
 
+        }
+
+        private bool rangeValid()
+        {
+            return rangeHigh - rangeLow >= 12;
         }
 
         private void Trail()
@@ -325,30 +353,13 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private void AdjustStop()
         {
-            double entryPrice = Position.AveragePrice;
-            if (noPositions())
-            {
-                status = "Flat";
-           //     SetStopLoss(CalculationMode.Ticks, 50);
-            }
-            else if (status == "Level")
-            {
-                SetStopLoss(CalculationMode.Price, rangeHigh - 1);
-            }
-            else if (status == "Breakeven")
-            {
-                SetStopLoss(CalculationMode.Price, entryPrice + atrValue*0.75);
-            }
-            else if (status == "Trail2")
-            {
-                SetStopLoss(CalculationMode.Price, _kama[0]);
-            }
+
         }
 
         private void CalculateTradeTime()
         {
 
-            if ((ToTime(Time[0]) >= _rthStartTime && ToTime(Time[0]) < _rthEndTime - 10000))
+            if ((ToTime(Time[0]) >= _rthStartTime && ToTime(Time[0]) <= _IbEndTime + 7000))
             {
                 _canTrade = true;
                 _takeTests = true;
@@ -378,41 +389,90 @@ namespace NinjaTrader.NinjaScript.Strategies
 OrderState orderState, DateTime time, ErrorCode error, string comment)
         {
 
-            double todayGlobexHigh = Levels4().GetTodayGlobexHigh(); // Correctly call the method
-            double todayGlobexLow = Levels4().GetTodayGlobexLow();
-            double todayIBHigh = Levels4().GetTodayIBHigh(); // Correctly call the method
-            double todayIBLow = Levels4().GetTodayIBLow();
 
             if (OrderFilled(order))
             {
-                if (averageFillPrice - rangeHigh > 8)
+                if(order.OrderType == OrderType.StopMarket)
                 {
-                    SetStopLoss("Long Base", CalculationMode.Ticks, Stop * 2 * TickSize, false);
-                    SetStopLoss("Long Runner",CalculationMode.Ticks, Stop * 2 * TickSize,false);
+                    retestCount++;
                 }
-                else
-                {
-                    SetStopLoss("Long Base", CalculationMode.Price, todayGlobexHigh - (Stop * TickSize),false);
-                    SetStopLoss("Long Runner", CalculationMode.Price, todayGlobexHigh - (Stop * TickSize),false);
-                }
+
+                    SetStopLoss(CalculationMode.Ticks, Stop);
+                    double todayGlobexHigh = Levels4().GetTodayGlobexHigh(); // Correctly call the method
+                    double todayGlobexLow = Levels4().GetTodayGlobexLow();
+                    double todayIBHigh = Levels4().GetTodayIBHigh(); // Correctly call the method
+                    double todayIBLow = Levels4().GetTodayIBLow();
+
 
                 if (order == _longOneOrder)
                 {
-                    SetProfitTarget("Long Base", CalculationMode.Price, averageFillPrice + atrValue * Target1);
+                    SetStopLoss(CalculationMode.Price, rangeLow - (Stop * TickSize));
+                    if (rangeHigh - rangeLow > 20)
+                    {
+                        SetProfitTarget("Long Base", CalculationMode.Ticks, 60);
+                    }
+                    else
+                    {
+                        SetProfitTarget("Long Base", CalculationMode.Ticks, 40);
+                    }
+
                 }
                 else if (order == _longTwoOrder)
                 {
-                    //runner
-                    SetProfitTarget("Long Runner", CalculationMode.Price, averageFillPrice + atrValue * Target2);
+                    SetStopLoss(CalculationMode.Price, todayIBLow - 2);
+                    if (rangeHigh - rangeLow > 20)
+                    {
+                        SetProfitTarget("Long Runner", CalculationMode.Ticks, 220);
+                    }
+                    else
+                    {
+                        SetProfitTarget("Long Runner", CalculationMode.Ticks, 60);
+                    }
                 }
 
+
+                if (order == _shortOneOrder)
+                {
+                    SetStopLoss(CalculationMode.Price, rangeHigh + (Stop * TickSize));
+                    if (rangeHigh - rangeLow > 20)
+                    {
+                        SetProfitTarget("Short Base", CalculationMode.Ticks, 60);
+                    }
+                    else
+                    {
+                        SetProfitTarget("Short Base", CalculationMode.Ticks, 40);
+                    }
+                }
+                else if (order == _shortTwoOrder)
+                {
+                    SetStopLoss(CalculationMode.Price, todayIBHigh + 2);
+                    if (rangeHigh - rangeLow > 20)
+                    {
+                        SetProfitTarget("Short Runner", CalculationMode.Ticks, 200);
+                    }
+                    else
+                    {
+                        SetProfitTarget("Short Runner", CalculationMode.Ticks, 60);
+                    }
+                }
+
+
             }
+        }
+        private double HighestHighOverLastBars(int barsBack)
+        {
+            double maxHigh = double.MinValue;
+            for (int i = 0; i < barsBack && i < CurrentBars[0]; i++)
+            {
+                maxHigh = Math.Max(maxHigh, Highs[0][i]);
+            }
+            return maxHigh;
         }
 
         private void AddIndicators()
         {
             _atr = ATR(BarsArray[1], AtrPeriod);
-            _kama = KAMA(BarsArray[0], 10,14,30);
+            _kama = KAMA(BarsArray[0], 10, 14, 30);
             //     _aroonSlow = Aroon(BarsArray[0], AroonPeriodSlow);
             //  AddChartIndicator(_atr);
             //     AddChartIndicator(_aroonSlow);
@@ -452,11 +512,11 @@ OrderState orderState, DateTime time, ErrorCode error, string comment)
             set { _numberOfRetests = value; }
         }
 
-        [Display(Name = "Breakout Treshold (ticks)", GroupName = "Test Parameters", Order = 1)]
-        public int breakoutTreshold
+        [Display(Name = "entry Treshold (ticks)", GroupName = "Test Parameters", Order = 1)]
+        public int entryTreshold
         {
-            get { return _breakoutTreshold; }
-            set { _breakoutTreshold = value; }
+            get { return _entryTreshold; }
+            set { _entryTreshold = value; }
         }
 
         [Display(Name = "Test Treshold (ticks)", GroupName = "Test Parameters", Order = 1)]
