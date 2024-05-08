@@ -194,6 +194,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 ExitLong("Exit Long After RTH", "Long Runner");
             };
 
+            if (retestCount >= numberOfRetests)
+                return;
 
             if (!_takeTests)
             {
@@ -235,22 +237,23 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 
                     //check if breakout was valid
-                    if (Closes[0][0] >= rangeHigh + (TickSize * breakoutTreshold) && !_breakoutValid && noPositions() && rangeHigh-todayGlobexHigh < 25 && retestCount < numberOfRetests) 
+                    if (Closes[0][0] >= rangeHigh + (TickSize * breakoutTreshold) && !_breakoutValid && noPositions() && rangeHigh-todayGlobexHigh < 25) 
                     {
                         int _nr = rnd.Next();
                         string rando = Convert.ToString(_nr);
                         string name = "tag " + rando;
+                        _breakoutValid = true;
                         Draw.ArrowUp(this, name, true, 0, Low[0] - 4 * TickSize, Brushes.Blue);
                         _longOneOrder = EnterLong(LotSize1, "Long Base");
                         _longTwoOrder = EnterLong(LotSize2, "Long Runner");
-                        retestCount++;
                     }
 
-                    if (Closes[0][0] <= rangeLow - (TickSize * breakoutTreshold) && !_breakoutValid && noPositions() && retestCount < numberOfRetests) 
+                    if (Closes[0][0] <= rangeLow - (TickSize * breakoutTreshold) && !_breakoutValid && noPositions()) 
                     {
                         int _nr = rnd.Next();
                         string rando = Convert.ToString(_nr);
                         string name = "tag " + rando;
+                        _breakoutValid = true;
                         Draw.ArrowDown(this, name, true, 0, High[0] + 4 * TickSize, Brushes.Red);
                     }
 
@@ -262,11 +265,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                     else
                     {
                         Trail();
+                                    Print("Trailing");
                         AdjustStop();
                     };
 
 
-
+                    if (_breakoutValid)
+                    {
+                        retestCount++;
+                        _breakoutValid = false;
+                    }
 
                 }
 
@@ -289,13 +297,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (Close[0] >= entryPrice + (atrValue * 0.25) && status != "Breakeven" && status != "Trail2" && status != "Level")
                 {
                     status = "Level";
+               //     Print("Levels");
                 }
                 if (Close[0] >= entryPrice + atrValue   && status == "Level")
                 {
                     status = "Breakeven";
+            //        Print("BREJK IVAN");
                 }
                 if (Close[0] >= entryPrice + atrValue * Target1/2  && status == "Breakeven" )
                 {
+           //         Print("Trail2");
                     status = "Trail2";
                 }
 
