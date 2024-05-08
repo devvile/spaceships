@@ -206,7 +206,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return;
             }
 
-                if (Position.MarketPosition == MarketPosition.Flat)
+            if (Position.MarketPosition == MarketPosition.Flat)
             {
                 status = "Flat";
 

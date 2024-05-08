@@ -40,6 +40,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         private List<DateRange> _dateRanges;
         private bool _signalModeActive;
         private CandleColor _signalModeColor;
+        private int _aroonLowTreshold;
+        private int _aroonHighTreshold;
         #endregion
 
 
@@ -63,7 +65,22 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         #endregion
 
+        #region Aroon
+        [Display(Name = "Aroon Low Treshold", GroupName = "Momentum", Order = 0)]
+        public int AroonLowTreshold
+        {
+            get { return _aroonLowTreshold; }
+            set { _aroonLowTreshold = value; }
+        }
 
+        [Display(Name = "Aroon High Treshold", GroupName = "Momentum", Order = 1)]
+        public int AroonHighTreshold
+        {
+            get { return _aroonHighTreshold; }
+            set { _aroonHighTreshold = value; }
+        }
+
+        #endregion
 
         #endregion
 
@@ -116,18 +133,25 @@ namespace NinjaTrader.NinjaScript.Strategies
             CheckTradingWindow();
             if (_canTrade)
             {
-                CandleColor currentCandleColor = Close[0] > Open[0] ? CandleColor.Green : CandleColor.Red;
-                bool lastCandleColorChange = LastCandleColorChange(currentCandleColor);
+                CandleColor currentCandleColor = DetermineCandleColor(0);
+                CandleColor previousCandleColor = DetermineCandleColor(1);
+                //xxx
 
-                // If last candle color change is detected, activate the signal mode.
-                if (lastCandleColorChange)
+
+                if (previousCandleColor == CandleColor.Doji && currentCandleColor!=CandleColor.Doji) {
+                    _signalModeActive = true;
+                    _signalModeColor = currentCandleColor;
+                }
+
+                else if (LastCandleColorChange(currentCandleColor) || currentCandleColor == CandleColor.Doji)
                 {
                     _signalModeActive = true;
                     _signalModeColor = currentCandleColor;
                 }
+
+
                 else if (currentCandleColor == _signalModeColor)
                 {
-                    // Continue to signal if subsequent candles are of the same color and signal mode is active
                     _signalModeActive = true;
                 }
                 else
@@ -139,7 +163,22 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     ProcessTradeConditions(currentCandleColor);
                 }
+
+
             }
+        }
+
+        private CandleColor DetermineCandleColor(int index)
+        {
+            if (Close[index] > Open[index])
+            {
+                return CandleColor.Green;
+            }
+            if (Close[index] == Open[index])
+            {
+                return CandleColor.Doji;
+            }
+            return CandleColor.Red;
         }
 
         private void CheckTradingWindow()
@@ -157,7 +196,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private int CheckLongConditions()
         {
-            bool condition1 = Aroon(15).Up[0] > 70 && Aroon(15).Down[0] < 30;
+            bool condition1 = Aroon(15).Up[0] > AroonHighTreshold && Aroon(15).Down[0] < AroonLowTreshold;
             bool condition2 = _momentum1[0] >= _momentum1TriggerValue;
             bool condition3 = _momentum2[0] >= _momentum2TriggerValue;
             return (condition1 ? 1 : 0) + (condition2 ? 1 : 0) + (condition3 ? 1 : 0);
@@ -165,7 +204,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private int CheckShortConditions()
         {
-            bool condition1 = Aroon(15).Down[0] > 70 && Aroon(15).Up[0] < 30;
+            bool condition1 = Aroon(15).Down[0] > AroonHighTreshold && Aroon(15).Up[0] < AroonLowTreshold;
             bool condition2 = _momentum1[0] <= -_momentum1TriggerValue;
             bool condition3 = _momentum2[0] <= -_momentum2TriggerValue;
             return (condition1 ? 1 : 0) + (condition2 ? 1 : 0) + (condition3 ? 1 : 0);
@@ -174,7 +213,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         private enum CandleColor
         {
             Red,
-            Green
+            Green,
+            Doji
         }
 
 
@@ -196,11 +236,11 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private void ExecuteTrades(int conditionsMetLong, int conditionsMetShort, CandleColor currentCandleColor)
         {
-            if (currentCandleColor == CandleColor.Red && conditionsMetLong >= 2)
+            if ((currentCandleColor == CandleColor.Red || currentCandleColor == CandleColor.Doji) && conditionsMetLong >= 2)
             {
                 DrawSignal("Long", Low[0] - 4 * TickSize, Brushes.Blue);
             }
-            if (currentCandleColor == CandleColor.Green &&  conditionsMetShort >= 2)
+            if ((currentCandleColor == CandleColor.Green || currentCandleColor == CandleColor.Doji) &&  conditionsMetShort >= 2)
             {
                 DrawSignal("Short", High[0] + 4 * TickSize, Brushes.Red);
             }

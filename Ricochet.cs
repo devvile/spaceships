@@ -58,6 +58,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         private Indicator _aroonMid;
 
 
+        double todayGlobexHigh;
+        double todayGlobexLow;
+        double todayIBHigh;
+        double todayIBLow;
         private double _aroonUp;
         private int _barsToCheck;
         private double _longStopMargin;
@@ -74,15 +78,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         private int _baseStopMarginLong;
         private double _targetRatioLong;
 
-        private int _entryFastStochValueShort;
-        private int _baseStopMarginShort;
-        private double _targetRatioShort;
 
         private int _aroonPeriod;
 
         private int _aroonFilter;
-        private int _aroonPeriodFast;
-        private int _aroonPeriodSlow;
         private double atrValue;
         private double stopLossPrice;
         private double _shortEntryPrice1;
@@ -94,15 +93,13 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private bool _useLongs = true;
         private bool _useShorts = true;
-        private bool _useAroon = true;
         private bool _canTrade = false;
-        private bool UseRsi = true;
 
 
         private int BarNr = 0;  //sprawdzic <-----
         Random rnd = new Random();
 
-        private string status = "Flat";
+        private string status;
 
 
         #endregion
@@ -197,8 +194,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                 ExitLong("Exit Long After RTH", "Long Runner");
             };
 
-            if (retestCount >= numberOfRetests)
-                return;
 
             if (!_takeTests)
             {
@@ -214,12 +209,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (BarsInProgress == 0)
                 {
 
-
-                    double todayGlobexHigh = Levels4().GetTodayGlobexHigh(); // Correctly call the method
-                    double todayGlobexLow = Levels4().GetTodayGlobexLow();
-                    double todayIBHigh = Levels4().GetTodayIBHigh(); // Correctly call the method
-                    double todayIBLow = Levels4().GetTodayIBLow();
-                    //   double rvol = ReVOLT(BarsArray[0], 10, 1.35, 0.8).GetRevol();
+                    todayGlobexHigh = Levels4().GetTodayGlobexHigh(); // Correctly call the method
+                    todayGlobexLow = Levels4().GetTodayGlobexLow();
+                    todayIBHigh = Levels4().GetTodayIBHigh(); // Correctly call the method
+                    todayIBLow = Levels4().GetTodayIBLow();
 
 
                     if (todayGlobexHigh > todayIBHigh && noPositions())
@@ -240,45 +233,38 @@ namespace NinjaTrader.NinjaScript.Strategies
                         rangeLow = todayIBLow;
                     }
 
+
                     //check if breakout was valid
-                    if (Closes[0][0] >= rangeHigh + (TickSize * breakoutTreshold) && !_breakoutValid && noPositions() && rangeHigh-todayGlobexHigh < 25) // && rvol > rvolTreshold)
+                    if (Closes[0][0] >= rangeHigh + (TickSize * breakoutTreshold) && !_breakoutValid && noPositions() && rangeHigh-todayGlobexHigh < 25 && retestCount < numberOfRetests) 
                     {
                         int _nr = rnd.Next();
                         string rando = Convert.ToString(_nr);
                         string name = "tag " + rando;
-                        _breakoutValid = true;
                         Draw.ArrowUp(this, name, true, 0, Low[0] - 4 * TickSize, Brushes.Blue);
                         _longOneOrder = EnterLong(LotSize1, "Long Base");
                         _longTwoOrder = EnterLong(LotSize2, "Long Runner");
-
-                        //    EnterLongLimit(0, true, 3, longPrice, "Long");
+                        retestCount++;
                     }
 
-                    if (Closes[0][0] <= rangeLow - (TickSize * breakoutTreshold) && !_breakoutValid && noPositions()) // &&  rvol> rvolTreshold)
+                    if (Closes[0][0] <= rangeLow - (TickSize * breakoutTreshold) && !_breakoutValid && noPositions() && retestCount < numberOfRetests) 
                     {
                         int _nr = rnd.Next();
                         string rando = Convert.ToString(_nr);
                         string name = "tag " + rando;
-                        _breakoutValid = true;
                         Draw.ArrowDown(this, name, true, 0, High[0] + 4 * TickSize, Brushes.Red);
-
-
                     }
 
-                    if (Position.MarketPosition == MarketPosition.Flat)
+                    if (noPositions())
                     {
-                        status = "Flat";
-
+                        SetStopLoss("Long Base", CalculationMode.Ticks, 20, false);
+                        SetStopLoss("Long Runner", CalculationMode.Ticks, 20, false);
                     }
-
+                    else
+                    {
                         Trail();
                         AdjustStop();
+                    };
 
-                    if (_breakoutValid)
-                    {
-                        retestCount++;
-                        _breakoutValid = false;
-                    }
 
 
 
@@ -287,9 +273,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                 else if (BarsInProgress == 1) // 4 min
                 {
                     atrValue = _atr[0];
-                    // Exits
-
-
                 }
             }
 
@@ -298,50 +281,48 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private void Trail()
         {
-            double entryPrice = Position.AveragePrice;
+            Print("Trailing");
+            double entryPrice = _longEntryPrice1;
             double currentPrice = Close[0];
-            if (status != "Flat")
-            {
-                Print(status);
 
-                if (Close[0] >= entryPrice + atrValue * 0.75 && Position.MarketPosition == MarketPosition.Long && status != "Breakeven" && status != "Trail2")
+
+                if (Close[0] >= entryPrice + (atrValue * 0.25) && status != "Breakeven" && status != "Trail2" && status != "Level")
                 {
                     status = "Level";
-                    Print("Levels");
                 }
-                if (Close[0] >= entryPrice + atrValue * 1.5 && Position.MarketPosition == MarketPosition.Long && BarsSinceEntryExecution() > 1 && status == "Level")
+                if (Close[0] >= entryPrice + atrValue   && status == "Level")
                 {
                     status = "Breakeven";
-                    Print("BREJK IVAN");
                 }
-                if (Close[0] > entryPrice + atrValue * Target1 && Position.MarketPosition == MarketPosition.Long && status == "Breakeven" && status != "Flat")
+                if (Close[0] >= entryPrice + atrValue * Target1/2  && status == "Breakeven" )
                 {
-                    Print("Trail2");
                     status = "Trail2";
                 }
-            }
 
         }
 
         private void AdjustStop()
         {
-            double entryPrice = Position.AveragePrice;
-            if (noPositions())
+                double entryPrice = _longEntryPrice1;
+                Print("in adjust Stop");
+                Print(status);
+
+            if (status == "Level")
             {
-                status = "Flat";
-           //     SetStopLoss(CalculationMode.Ticks, 50);
+                Print("ADjusting stop on Levels");
+                SetStopLoss("Long Runner",CalculationMode.Price, rangeHigh,false);
+                SetStopLoss("Long Base",CalculationMode.Price, rangeHigh,false);
+
             }
-            else if (status == "Level")
+             if (status == "Breakeven")
             {
-                SetStopLoss(CalculationMode.Price, rangeHigh - 1);
+                SetStopLoss("Long Runner", CalculationMode.Price, _kama[1] - atrValue, false);
+                SetStopLoss("Long Base", CalculationMode.Price, _kama[1] - atrValue, false);
             }
-            else if (status == "Breakeven")
+            if (status == "Trail2")
             {
-                SetStopLoss(CalculationMode.Price, entryPrice + atrValue*0.75);
-            }
-            else if (status == "Trail2")
-            {
-                SetStopLoss(CalculationMode.Price, _kama[0]);
+                SetStopLoss("Long Runner", CalculationMode.Price, _kama[1] - 1,false);
+                SetStopLoss("Long Base", CalculationMode.Price, _kama[1] - 1, false);
             }
         }
 
@@ -374,18 +355,17 @@ namespace NinjaTrader.NinjaScript.Strategies
             return order.OrderState == OrderState.Filled;
         }
 
-        protected override void OnOrderUpdate(Order order, double limitPrice, double stopPrice, int quantity, int filled, double averageFillPrice,
-OrderState orderState, DateTime time, ErrorCode error, string comment)
+        protected override void OnExecutionUpdate(Execution execution, string executionId, double price, int quantity, MarketPosition marketPosition, string orderId, DateTime time)
         {
 
-            double todayGlobexHigh = Levels4().GetTodayGlobexHigh(); // Correctly call the method
-            double todayGlobexLow = Levels4().GetTodayGlobexLow();
-            double todayIBHigh = Levels4().GetTodayIBHigh(); // Correctly call the method
-            double todayIBLow = Levels4().GetTodayIBLow();
 
-            if (OrderFilled(order))
+            if (OrderFilled(execution.Order)) //moze to jest problemem
             {
-                if (averageFillPrice - rangeHigh > 8)
+                if(execution.Order.Name == "Profit target")
+                {
+                    SetStopLoss("Long Runner", CalculationMode.Price, KAMA(BarsArray[0], 10, 14, 30)[1], false);
+                };
+                if (price - rangeHigh > 8)
                 {
                     SetStopLoss("Long Base", CalculationMode.Ticks, Stop * 2 * TickSize, false);
                     SetStopLoss("Long Runner",CalculationMode.Ticks, Stop * 2 * TickSize,false);
@@ -396,14 +376,16 @@ OrderState orderState, DateTime time, ErrorCode error, string comment)
                     SetStopLoss("Long Runner", CalculationMode.Price, todayGlobexHigh - (Stop * TickSize),false);
                 }
 
-                if (order == _longOneOrder)
+                if (execution.Order == _longOneOrder)
                 {
-                    SetProfitTarget("Long Base", CalculationMode.Price, averageFillPrice + atrValue * Target1);
+                    _longEntryPrice1 = price;
+                    SetProfitTarget("Long Base", CalculationMode.Price, execution.Order.AverageFillPrice + atrValue * Target1);
+             //         ExitLongLimit(0,true,LotSize1, execution.Order.AverageFillPrice + atrValue * Target1, "Profit Target1", "Long Base");
+                    status = "Long Default";
                 }
-                else if (order == _longTwoOrder)
+                else if (execution.Order == _longTwoOrder)
                 {
-                    //runner
-                    SetProfitTarget("Long Runner", CalculationMode.Price, averageFillPrice + atrValue * Target2);
+         //           ExitLongLimit(LotSize2, execution.Order.AverageFillPrice + atrValue * Target2, "Profit Target2", "Long Runner");
                 }
 
             }
@@ -413,9 +395,6 @@ OrderState orderState, DateTime time, ErrorCode error, string comment)
         {
             _atr = ATR(BarsArray[1], AtrPeriod);
             _kama = KAMA(BarsArray[0], 10,14,30);
-            //     _aroonSlow = Aroon(BarsArray[0], AroonPeriodSlow);
-            //  AddChartIndicator(_atr);
-            //     AddChartIndicator(_aroonSlow);
             _rvol = ReVOLT(BarsArray[0], 10, 1.3, 0.8);
             AddChartIndicator(_rvol);
             AddChartIndicator(_kama);
@@ -538,63 +517,6 @@ OrderState orderState, DateTime time, ErrorCode error, string comment)
         #endregion
 
 
-        #region Aroon
-
-        [Display(Name = "Aroon Period Fast", GroupName = "Aroon", Order = 0)]
-        public int AroonPeriodFast
-        {
-            get { return _aroonPeriodFast; }
-            set { _aroonPeriodFast = value; }
-        }
-
-
-        [Display(Name = "Aroon Period Slow", GroupName = "Aroon", Order = 0)]
-        public int AroonPeriodSlow
-        {
-            get { return _aroonPeriodSlow; }
-            set { _aroonPeriodSlow = value; }
-        }
-
-        [Display(Name = "Aroon Entry Filter", GroupName = "Aroon", Order = 0)]
-        public int AroonFilter
-        {
-            get { return _aroonFilter; }
-            set { _aroonFilter = value; }
-        }
-
-
-
-
-        #endregion
-
-        /*
-
-
-#region Longs
-
-[Display(Name = "Long Stop Margin", GroupName = "LONGS", Order = 0)]
-public double LongStopMargin
-{
-    get { return _longStopMargin; }
-    set { _longStopMargin = value; }
-}
-
-
-#endregion
-
-#region Shorts
-
-[Display(Name = "Short Stop Margin", GroupName = "SHORTS", Order = 0)]
-public double ShortStopMargin
-{
-    get { return _shortStopMargin; }
-    set { _shortStopMargin = value; }
-}
-
-#endregion
-
-
-*/
 
         #endregion
 
