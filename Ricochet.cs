@@ -194,8 +194,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                 ExitLong("Exit Long After RTH", "Long Runner");
             };
 
-            if (retestCount >= numberOfRetests)
-                return;
 
             if (!_takeTests)
             {
@@ -237,7 +235,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 
                     //check if breakout was valid
-                    if (Closes[0][0] >= rangeHigh + (TickSize * breakoutTreshold) && !_breakoutValid && noPositions() && rangeHigh-todayGlobexHigh < 25) 
+                    if (Closes[0][0] >= rangeHigh + (TickSize * breakoutTreshold) && !_breakoutValid && noPositions() && rangeHigh-todayGlobexHigh < 25 && retestCount < numberOfRetests) 
                     {
                         int _nr = rnd.Next();
                         string rando = Convert.ToString(_nr);
@@ -261,12 +259,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                     {
                         SetStopLoss("Long Base", CalculationMode.Ticks, 20, false);
                         SetStopLoss("Long Runner", CalculationMode.Ticks, 20, false);
+                        status = "Flat";
                     }
                     else
                     {
+                        
                         Trail();
-                                    Print("Trailing");
                         AdjustStop();
+                        
                     };
 
 
@@ -294,19 +294,18 @@ namespace NinjaTrader.NinjaScript.Strategies
             double currentPrice = Close[0];
 
 
-                if (Close[0] >= entryPrice + (atrValue * 0.25) && status != "Breakeven" && status != "Trail2" && status != "Level")
+                if (Close[0] >= entryPrice + (atrValue * 0.75) && status != "Breakeven" && status != "Trail2" && status != "Level" && !(entryPrice - rangeHigh > 8))
                 {
                     status = "Level";
-               //     Print("Levels");
                 }
-                if (Close[0] >= entryPrice + atrValue   && status == "Level")
+                if (Close[0] >= entryPrice + atrValue * 2  && status != "Breakeven" && status !="Trail2")
                 {
                     status = "Breakeven";
             //        Print("BREJK IVAN");
                 }
-                if (Close[0] >= entryPrice + atrValue * Target1/2  && status == "Breakeven" )
+                if (High[0] >= entryPrice + atrValue * Target1  && status == "Breakeven" )
                 {
-           //         Print("Trail2");
+
                     status = "Trail2";
                 }
 
@@ -321,19 +320,19 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (status == "Level")
             {
                 Print("ADjusting stop on Levels");
-                SetStopLoss("Long Runner",CalculationMode.Price, rangeHigh,false);
-                SetStopLoss("Long Base",CalculationMode.Price, rangeHigh,false);
+                SetStopLoss("Long Runner",CalculationMode.Price, rangeHigh-1,false);
+                SetStopLoss("Long Base",CalculationMode.Price, rangeHigh-1,false);
 
-            }
+            } 
              if (status == "Breakeven")
             {
-                SetStopLoss("Long Runner", CalculationMode.Price, _kama[1] - atrValue, false);
-                SetStopLoss("Long Base", CalculationMode.Price, _kama[1] - atrValue, false);
+                SetStopLoss("Long Runner", CalculationMode.Price, entryPrice, false);
+                SetStopLoss("Long Base", CalculationMode.Price, entryPrice, false);
             }
-            if (status == "Trail2")
+                if (status == "Trail2")
             {
-                SetStopLoss("Long Runner", CalculationMode.Price, _kama[1] - 1,false);
-                SetStopLoss("Long Base", CalculationMode.Price, _kama[1] - 1, false);
+               SetStopLoss("Long Runner", CalculationMode.Price, Bollinger(2, 10).Lower[0] - atrValue/2, false);
+               SetStopLoss("Long Base", CalculationMode.Price, Bollinger(2, 10).Lower[0] - atrValue/2, false);
             }
         }
 
@@ -390,7 +389,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (execution.Order == _longOneOrder)
                 {
                     _longEntryPrice1 = price;
-                    SetProfitTarget("Long Base", CalculationMode.Price, execution.Order.AverageFillPrice + atrValue * Target1);
+               //     SetProfitTarget("Long Base", CalculationMode.Price, execution.Order.AverageFillPrice + atrValue * Target1);
              //         ExitLongLimit(0,true,LotSize1, execution.Order.AverageFillPrice + atrValue * Target1, "Profit Target1", "Long Base");
                     status = "Long Default";
                 }
