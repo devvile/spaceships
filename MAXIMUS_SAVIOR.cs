@@ -21,12 +21,13 @@ using NinjaTrader.NinjaScript.DrawingTools;
 
 namespace NinjaTrader.NinjaScript.Strategies
 {
-    public class Maximus_Resurrected2 : Strategy
+    public class Maximus_Savior : Strategy
     {
         #region declarations
         private Indicator _aroon;
         private Indicator _momentum1;
         private Indicator _momentum2;
+        private Indicator _atr;
         private double _momentum1TriggerValue;
         private double _momentum2TriggerValue;
         private bool _canTrade;
@@ -43,7 +44,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         private double signalCandleHigh;
         private double signalCandleLow;
         private string lastSignalDirection;
+        private double atrValue;
         private int _atrPeriod;
+        private double _atrStopRatio;
+        private double _atrTargetRatio;
         #endregion
 
         #region My Parameters
@@ -54,6 +58,20 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             get { return _atrPeriod; }
             set { _atrPeriod = value; }
+        }
+
+        [Display(Name = "Atr Stop Ratio", GroupName = "Filters", Order = 0)]
+        public double AtrStopRatio
+        {
+            get { return _atrStopRatio; }
+            set { _atrStopRatio = value; }
+        }
+
+        [Display(Name = "Atr Target Ratio", GroupName = "Filters", Order = 0)]
+        public double AtrTargetRatio
+        {
+            get { return _atrTargetRatio; }
+            set { _atrTargetRatio = value; }
         }
 
         #endregion
@@ -99,7 +117,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (State == State.SetDefaults)
             {
                 Description = "Maximus Resurrected Strategy";
-                Name = "Maximus Resurrected 2";
+                Name = "Maximus Savior";
                 Calculate = Calculate.OnBarClose;
                 BarsRequiredToTrade = 60;
             }
@@ -109,6 +127,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 EntryHandling = EntryHandling.AllEntries;
                 EntriesPerDirection = 6;
                 ClearOutputWindow();
+                AddDataSeries(BarsPeriodType.Minute, 15);
             }
             else if (State == State.DataLoaded)
             {
@@ -138,7 +157,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         protected override void OnBarUpdate()
         {
-            if (CurrentBar < BarsRequiredToTrade) return;
+            if (CurrentBars[0] < BarsRequiredToTrade || CurrentBars[1] < BarsRequiredToTrade)
+                return;
             CheckTradingWindow();
             if (ToTime(Time[0]) == _rthStartTime)
             {
@@ -146,8 +166,17 @@ namespace NinjaTrader.NinjaScript.Strategies
                 signalCandleLow = 0;
                 _signalModeActive = false;
             }
+            /*
+            if (ToTime(Time[0]) >= _rthEndTime && Position.MarketPosition == MarketPosition.Long)
+            {
+                ExitLong("Exit Long After RTH", "Long Base");
+            }else if (ToTime(Time[0]) >= _rthEndTime && Position.MarketPosition == MarketPosition.Short)
+            {
+                ExitShort("Exit Short After RTH", "Short Base");
+            }*/
 
-            if (_canTrade)
+
+            if (_canTrade && BarsInProgress==0)
             {
                 CandleColor currentCandleColor = DetermineCandleColor(0);
                 CandleColor previousCandleColor = DetermineCandleColor(1);
@@ -179,7 +208,39 @@ namespace NinjaTrader.NinjaScript.Strategies
                     ProcessEntryConditions(currentCandleColor, _signalModeColor, entryPrice, signalCandleHigh, signalCandleLow);
                 }
             }
+            if (BarsInProgress == 1)
+            {
+                atrValue = _atr[0];
+            }
         }
+
+                protected override void OnExecutionUpdate(Execution execution, string executionId, double price, int quantity, MarketPosition marketPosition, string orderId, DateTime time)
+        {
+
+
+            if (OrderFilled(execution.Order)) //moze to jest problemem
+            {
+
+                if (execution.Order.Name == "Long Base")
+                {
+                    SetStopLoss("Long Base", CalculationMode.Price, price - atrValue * AtrStopRatio, false);
+                    SetProfitTarget("Long Base", CalculationMode.Price, price + atrValue * AtrTargetRatio);
+
+                }
+                else
+                {
+                    SetStopLoss("Short Base", CalculationMode.Price, price + atrValue * AtrStopRatio, false);
+                    SetProfitTarget("Short Base", CalculationMode.Price, price - atrValue * AtrTargetRatio);
+                }
+
+            }
+        }
+
+        private bool OrderFilled(Order order)
+        {
+            return order.OrderState == OrderState.Filled;
+        }
+
 
         private void ProcessEntryConditions(CandleColor currentCandleColor, CandleColor signalModeColor, double entryPrice, double signalCandleHigh, double signalCandleLow)
         {
@@ -190,14 +251,22 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 Print("Short MET");
                 _signalModeActive = false;
-                DrawSignal("Short", High[0] + 10 * TickSize, Brushes.Yellow);
+                if (noPositions())
+                {
+                    EnterShort(1, "Short Base");
+                }
+              //  DrawSignal("Short", High[0] + 10 * TickSize, Brushes.Yellow);
             }
             if (currentCandleColor != signalModeColor  && High[0] > signalCandleHigh && conditionsMetLong >= 2 && lastSignalDirection == "Long")
             {
                 Print("Long MET");
                 Print(Time[0]);
                  _signalModeActive = false;
-                DrawSignal("Long", Low[0] - 10 * TickSize, Brushes.Yellow);
+                if (noPositions())
+                {
+                    EnterLong(1, "Long Base");
+                }
+            //   DrawSignal("Long", Low[0] - 10 * TickSize, Brushes.Yellow);
             }
         }
 
@@ -219,21 +288,27 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private void ExecuteSignals(int conditionsMetLong, int conditionsMetShort, CandleColor currentCandleColor)
         {
-            if ((currentCandleColor == CandleColor.Green || currentCandleColor == CandleColor.Doji) && conditionsMetLong >= 2)
+            if ((currentCandleColor == CandleColor.Red || currentCandleColor == CandleColor.Doji) && conditionsMetLong >= 2)
             {
-               DrawSignal("Long", Low[0] - 4 * TickSize, Brushes.Blue);
+          //     DrawSignal("Long", Low[0] - 4 * TickSize, Brushes.Blue);
                 signalCandleHigh = High[0];
                 signalCandleLow = Low[0];
                 lastSignalDirection = "Long";
             }
-            if ((currentCandleColor == CandleColor.Red || currentCandleColor == CandleColor.Doji) && conditionsMetShort >= 2)
+            if ((currentCandleColor == CandleColor.Green || currentCandleColor == CandleColor.Doji) && conditionsMetShort >= 2)
             {
-                DrawSignal("Short", High[0] + 4 * TickSize, Brushes.Red);
+           //     DrawSignal("Short", High[0] + 4 * TickSize, Brushes.Red);
                 signalCandleHigh = High[0];
                 signalCandleLow = Low[0];
                 lastSignalDirection = "Short";
             }
         }
+
+        private bool noPositions()
+        {
+            return Position.MarketPosition == MarketPosition.Flat;
+        }
+
 
         private double SetEntryPrice(CandleColor currentCandleColor)
         {
@@ -311,10 +386,10 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private void AddIndicators()
         {
-            _aroon = Aroon(15);
-       //     _atr = ATR(BarsArray[1], AtrPeriod);
-            _momentum1 = Momentum(EMA(10), 5);
-            _momentum2 = Momentum(Bollinger(2, 14).Middle, 5);
+            _aroon = Aroon(BarsArray[0], 15);
+            _atr = ATR(BarsArray[1], AtrPeriod);
+            _momentum1 = Momentum(EMA(BarsArray[0], 10), 5);
+            _momentum2 = Momentum(Bollinger(BarsArray[0], 2, 14).Middle, 5);
         }
 
         public class DateRange

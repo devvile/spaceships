@@ -396,7 +396,7 @@ OrderState orderState, DateTime time, ErrorCode error, string comment)
                 if (averageFillPrice - rangeHigh > 7)
           //      if (averageFillPrice - rangeHigh > atrValue * 1.5 )
                 {
-                    SetStopLoss(CalculationMode.Ticks, Stop * 2 * TickSize);
+          //          SetStopLoss(CalculationMode.Ticks, Stop * 2 * TickSize);
                 }
                 else
                 {

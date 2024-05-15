@@ -243,8 +243,9 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 RealtimeErrorHandling = RealtimeErrorHandling.IgnoreAllErrors;
                 BarsRequiredToTrade = BarsToCheck;
-                AddDataSeries(BarsPeriodType.Minute, 4);
                 AddDataSeries(BarsPeriodType.Minute, 1);
+                AddDataSeries(BarsPeriodType.Minute, 4);
+
             }
             else if (State == State.DataLoaded)
             {

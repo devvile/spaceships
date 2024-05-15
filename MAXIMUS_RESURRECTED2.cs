@@ -18,10 +18,13 @@ using NinjaTrader.NinjaScript;
 using NinjaTrader.Core.FloatingPoint;
 using NinjaTrader.NinjaScript.Indicators;
 using NinjaTrader.NinjaScript.DrawingTools;
+using System.Security.Cryptography;
+using System.ComponentModel;
+
 
 namespace NinjaTrader.NinjaScript.Strategies
 {
-    public class Maximus_Resurrected2 : Strategy
+    public class Maximus_Resurrected : Strategy
     {
         #region declarations
         private Indicator _aroon;
@@ -40,38 +43,26 @@ namespace NinjaTrader.NinjaScript.Strategies
         private int _aroonLowTreshold;
         private int _aroonHighTreshold;
         private double entryPrice;
-        private double signalCandleHigh;
-        private double signalCandleLow;
-        private string lastSignalDirection;
-        private int _atrPeriod;
         #endregion
+
 
         #region My Parameters
-
-        #region ATR
-        [Display(Name = "Atr period", GroupName = "Filters", Order = 0)]
-        public int AtrPeriod
-        {
-            get { return _atrPeriod; }
-            set { _atrPeriod = value; }
-        }
-
-        #endregion
 
         #region Momentum
         [Display(Name = "Momentum 1 Trigger (EMA)", GroupName = "Momentum", Order = 0)]
         public double Momentum1TriggerValue
         {
             get { return _momentum1TriggerValue; }
-            set { _momentum1TriggerValue = value; }
+            set {_momentum1TriggerValue = value;}
         }
 
         [Display(Name = "Momentum 2 Trigger (BB)", GroupName = "Momentum", Order = 1)]
         public double Momentum2TriggerValue
         {
-            get { return _momentum2TriggerValue; }
-            set { _momentum2TriggerValue = value; }
+            get  {return   _momentum2TriggerValue; }
+            set  { _momentum2TriggerValue = value; }
         }
+
 
         #endregion
 
@@ -94,12 +85,13 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         #endregion
 
+
         protected override void OnStateChange()
         {
             if (State == State.SetDefaults)
             {
                 Description = "Maximus Resurrected Strategy";
-                Name = "Maximus Resurrected 2";
+                Name = "Maximus Resurrected";
                 Calculate = Calculate.OnBarClose;
                 BarsRequiredToTrade = 60;
             }
@@ -108,7 +100,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                 ConfigureDateRanges();
                 EntryHandling = EntryHandling.AllEntries;
                 EntriesPerDirection = 6;
-                ClearOutputWindow();
             }
             else if (State == State.DataLoaded)
             {
@@ -135,73 +126,66 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // Add more ranges as needed
             };
         }
+        //ekspansja range'u
+        // dodanie strzalki entry 
+        //Jesli low swieczki zamyka sie pow/pon low/high siweczki sygnalowej i jest na niej conajmniej 2/3 warunkow trybu active to mamy entry
+        // dodanie punktu stop
+        //zebrac informacje o ostatniej swieczce active
+
 
         protected override void OnBarUpdate()
         {
             if (CurrentBar < BarsRequiredToTrade) return;
             CheckTradingWindow();
-            if (ToTime(Time[0]) == _rthStartTime)
-            {
-                signalCandleHigh = 999999;
-                signalCandleLow = 0;
-                _signalModeActive = false;
-            }
-
             if (_canTrade)
             {
                 CandleColor currentCandleColor = DetermineCandleColor(0);
                 CandleColor previousCandleColor = DetermineCandleColor(1);
 
-                if ((previousCandleColor == CandleColor.Doji && currentCandleColor != CandleColor.Doji) || (LastCandleColorChange(currentCandleColor) || currentCandleColor == CandleColor.Doji) && _signalModeActive == false)
-                {
+                if ((previousCandleColor == CandleColor.Doji && currentCandleColor!=CandleColor.Doji) || (LastCandleColorChange(currentCandleColor) || currentCandleColor == CandleColor.Doji)) {
                     _signalModeActive = true;
                     _signalModeColor = currentCandleColor;
-                    entryPrice = SetEntryPrice(currentCandleColor);
+                    entryPrice = setEntryPrice(currentCandleColor);
                 }
-                else if (currentCandleColor == _signalModeColor && _signalModeActive || currentCandleColor == CandleColor.Doji)
+
+                else if (currentCandleColor == _signalModeColor)
                 {
                     _signalModeActive = true;
-                    entryPrice = SetEntryPrice(currentCandleColor);
+                    entryPrice = setEntryPrice(currentCandleColor);
                 }
                 else
                 {
                     _signalModeActive = false;
-                    Print(Time[0]);
                 }
 
                 if (_signalModeActive == true)
                 {
-                  ProcessSignalConditions(currentCandleColor, _signalModeColor, entryPrice);
-
+                    ProcessSignalConditions(currentCandleColor, _signalModeColor, entryPrice);
                 }
                 else
                 {
-                    ProcessEntryConditions(currentCandleColor, _signalModeColor, entryPrice, signalCandleHigh, signalCandleLow);
+                    ProcessEntryConditions(currentCandleColor, _signalModeColor, entryPrice);
                 }
             }
         }
 
-        private void ProcessEntryConditions(CandleColor currentCandleColor, CandleColor signalModeColor, double entryPrice, double signalCandleHigh, double signalCandleLow)
+        private void ProcessEntryConditions(CandleColor currentCandleColor, CandleColor _signalModeColor, double entryPrice)
         {
             int conditionsMetLong = CheckLongConditions();
             int conditionsMetShort = CheckShortConditions();
-            Print("Processing Entry Conditions");
-            if (currentCandleColor != signalModeColor  && Low[0] < signalCandleLow && conditionsMetShort >= 2 && lastSignalDirection =="Short")
+
+            if(currentCandleColor != _signalModeColor && currentCandleColor == CandleColor.Red && Low[0] < entryPrice && conditionsMetShort >= 2)
             {
-                Print("Short MET");
-                _signalModeActive = false;
-                DrawSignal("Short", High[0] + 10 * TickSize, Brushes.Yellow);
-            }
-            if (currentCandleColor != signalModeColor  && High[0] > signalCandleHigh && conditionsMetLong >= 2 && lastSignalDirection == "Long")
+                DrawSignal("Short", High[0] + 4 * TickSize, Brushes.Yellow);
+            }/*
+            if (currentCandleColor != _signalModeColor && currentCandleColor == CandleColor.Red && Low[0] < entryPrice && conditionsMetShort >= 2)
             {
-                Print("Long MET");
-                Print(Time[0]);
-                 _signalModeActive = false;
-                DrawSignal("Long", Low[0] - 10 * TickSize, Brushes.Yellow);
+                DrawSignal("Short", High[0] + 4 * TickSize, Brushes.Yellow);
             }
+            */
         }
 
-        private void ProcessSignalConditions(CandleColor currentCandleColor, CandleColor signalModeColor, double entryPrice)
+        private void ProcessSignalConditions(CandleColor currentCandleColor, CandleColor _signalModeColor, double entryPrice)
         {
             int conditionsMetLong = CheckLongConditions();
             int conditionsMetShort = CheckShortConditions();
@@ -219,26 +203,19 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private void ExecuteSignals(int conditionsMetLong, int conditionsMetShort, CandleColor currentCandleColor)
         {
-            if ((currentCandleColor == CandleColor.Green || currentCandleColor == CandleColor.Doji) && conditionsMetLong >= 2)
+            if ((currentCandleColor == CandleColor.Red || currentCandleColor == CandleColor.Doji) && conditionsMetLong >= 2)
             {
-               DrawSignal("Long", Low[0] - 4 * TickSize, Brushes.Blue);
-                signalCandleHigh = High[0];
-                signalCandleLow = Low[0];
-                lastSignalDirection = "Long";
+                DrawSignal("Long", Low[0] - 4 * TickSize, Brushes.Blue);
             }
-            if ((currentCandleColor == CandleColor.Red || currentCandleColor == CandleColor.Doji) && conditionsMetShort >= 2)
+            if ((currentCandleColor == CandleColor.Green || currentCandleColor == CandleColor.Doji) && conditionsMetShort >= 2)
             {
                 DrawSignal("Short", High[0] + 4 * TickSize, Brushes.Red);
-                signalCandleHigh = High[0];
-                signalCandleLow = Low[0];
-                lastSignalDirection = "Short";
             }
         }
 
-        private double SetEntryPrice(CandleColor currentCandleColor)
+        private double setEntryPrice(CandleColor currentCandleColor)
         {
-            if (currentCandleColor == CandleColor.Green)
-            {
+            if (currentCandleColor== CandleColor.Green) {
                 return Low[0];
             }
             else
@@ -272,9 +249,10 @@ namespace NinjaTrader.NinjaScript.Strategies
             _canTrade = currentTime >= _rthStartTime && currentTime < _rthEndTime;
         }
 
+
         private int CheckLongConditions()
         {
-            bool condition1 = Aroon(15).Up[0] > _aroonHighTreshold && Aroon(15).Down[0] < _aroonLowTreshold;
+            bool condition1 = Aroon(15).Up[0] > AroonHighTreshold && Aroon(15).Down[0] < AroonLowTreshold;
             bool condition2 = _momentum1[0] >= _momentum1TriggerValue;
             bool condition3 = _momentum2[0] >= _momentum2TriggerValue;
             return (condition1 ? 1 : 0) + (condition2 ? 1 : 0) + (condition3 ? 1 : 0);
@@ -282,7 +260,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private int CheckShortConditions()
         {
-            bool condition1 = Aroon(15).Down[0] > _aroonHighTreshold && Aroon(15).Up[0] < _aroonLowTreshold;
+            bool condition1 = Aroon(15).Down[0] > AroonHighTreshold && Aroon(15).Up[0] < AroonLowTreshold;
             bool condition2 = _momentum1[0] <= -_momentum1TriggerValue;
             bool condition3 = _momentum2[0] <= -_momentum2TriggerValue;
             return (condition1 ? 1 : 0) + (condition2 ? 1 : 0) + (condition3 ? 1 : 0);
@@ -295,6 +273,8 @@ namespace NinjaTrader.NinjaScript.Strategies
             Doji
         }
 
+
+
         private void DrawSignal(string direction, double price, Brush color)
         {
             int randomNumber = _rnd.Next();
@@ -302,6 +282,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (direction == "Long")
             {
                 Draw.ArrowUp(this, tag, true, 0, price, color);
+            //    Draw.Diamond(this, tag + "dot", true, 0, Lows[0][0] - 4, Brushes.Yellow);
             }
             else
             {
@@ -309,12 +290,13 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
         }
 
+
         private void AddIndicators()
         {
             _aroon = Aroon(15);
-       //     _atr = ATR(BarsArray[1], AtrPeriod);
-            _momentum1 = Momentum(EMA(10), 5);
-            _momentum2 = Momentum(Bollinger(2, 14).Middle, 5);
+            _momentum1 = Momentum(EMA(10),5);
+            _momentum2 = Momentum(Bollinger(2,14).Middle, 5);
+        //    AddChartIndicator(_aroon);
         }
 
         public class DateRange
@@ -324,6 +306,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             public DateRange(int startYear, int startMonth, int startDay, int endYear, int endMonth, int endDay)
             {
+                // Format the dates as strings in yyyyMMdd format and then convert to integers
                 StartDate = int.Parse(string.Format("{0}{1:D2}{2:D2}", startYear, startMonth, startDay));
                 EndDate = int.Parse(string.Format("{0}{1:D2}{2:D2}", endYear, endMonth, endDay));
             }
@@ -333,5 +316,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                 return date >= StartDate && date <= EndDate;
             }
         }
+
     }
 }

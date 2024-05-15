@@ -192,6 +192,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 ExitLong("Exit Long After RTH", "Long Base");
                 ExitLong("Exit Long After RTH", "Long Runner");
+       //         ExitLong("Exit Long After RTH", "Addon");
             };
 
 
@@ -237,13 +238,26 @@ namespace NinjaTrader.NinjaScript.Strategies
                     //check if breakout was valid
                     if (Closes[0][0] >= rangeHigh + (TickSize * breakoutTreshold) && !_breakoutValid && noPositions() && rangeHigh-todayGlobexHigh < 25 && retestCount < numberOfRetests) 
                     {
+                        int posSize = 0;
+                        if(rangeHigh - todayGlobexHigh < atrValue * 2)
+                        {
+                            posSize = LotSize2;
+                        }
+                        else if (rangeHigh - todayGlobexHigh <= atrValue * 4)
+                        {
+                            posSize = LotSize2/2;
+                        }
+                        else
+                        {
+                            posSize = (LotSize2 / 3);
+                        }
                         int _nr = rnd.Next();
                         string rando = Convert.ToString(_nr);
                         string name = "tag " + rando;
                         _breakoutValid = true;
                         Draw.ArrowUp(this, name, true, 0, Low[0] - 4 * TickSize, Brushes.Blue);
                         _longOneOrder = EnterLong(LotSize1, "Long Base");
-                        _longTwoOrder = EnterLong(LotSize2, "Long Runner");
+                        _longTwoOrder = EnterLong(posSize, "Long Runner");
                     }
 
                     if (Closes[0][0] <= rangeLow - (TickSize * breakoutTreshold) && !_breakoutValid && noPositions()) 
@@ -257,16 +271,20 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                     if (noPositions())
                     {
-                        SetStopLoss("Long Base", CalculationMode.Ticks, 20, false);
-                        SetStopLoss("Long Runner", CalculationMode.Ticks, 20, false);
+                        SetStopLoss("Long Base", CalculationMode.Ticks, 40, false);
+                        SetStopLoss("Long Runner", CalculationMode.Ticks, 40, false);
                         status = "Flat";
                     }
                     else
                     {
-                        
                         Trail();
-                        AdjustStop();
-                        
+
+                        if (status == "Breakeven" && !noPositions())
+                        {
+                 //          EnterLong(2, "Addon");
+                        }
+
+                        AdjustStop();   
                     };
 
 
@@ -301,7 +319,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (Close[0] >= entryPrice + atrValue * 2  && status != "Breakeven" && status !="Trail2")
                 {
                     status = "Breakeven";
-            //        Print("BREJK IVAN");
                 }
                 if (High[0] >= entryPrice + atrValue * Target1  && status == "Breakeven" )
                 {
@@ -328,12 +345,17 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 SetStopLoss("Long Runner", CalculationMode.Price, entryPrice, false);
                 SetStopLoss("Long Base", CalculationMode.Price, entryPrice, false);
+  //              SetStopLoss("Addon", CalculationMode.Price, entryPrice, false);
             }
                 if (status == "Trail2")
             {
                SetStopLoss("Long Runner", CalculationMode.Price, Bollinger(2, 10).Lower[0] - atrValue/2, false);
                SetStopLoss("Long Base", CalculationMode.Price, Bollinger(2, 10).Lower[0] - atrValue/2, false);
+//               SetStopLoss("Addon", CalculationMode.Price, Bollinger(2, 10).Lower[0] - atrValue / 2, false);
+
             }
+
+               
         }
 
         private void CalculateTradeTime()
@@ -350,6 +372,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                 _takeTests = false;
             }
         }
+        private bool previousCandleRed()
+        {
+            return HeikenAshi8(BarsArray[0]).HAOpen[0] > HeikenAshi8(BarsArray[0]).HAClose[0] && HeikenAshi8(BarsArray[0]).HAOpen[1] < HeikenAshi8(BarsArray[0]).HAClose[1];
+        }
+
+        private bool previousCandleGreen()
+        {
+            return HeikenAshi8(BarsArray[0]).HAOpen[0] < HeikenAshi8(BarsArray[0]).HAClose[0] && HeikenAshi8(BarsArray[0]).HAOpen[1] > HeikenAshi8(BarsArray[0]).HAClose[1];
+        }
+
 
 
 
@@ -373,9 +405,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 if(execution.Order.Name == "Profit target")
                 {
-                    SetStopLoss("Long Runner", CalculationMode.Price, KAMA(BarsArray[0], 10, 14, 30)[1], false);
+                 //   SetStopLoss("Long Runner", CalculationMode.Price, KAMA(BarsArray[0], 10, 14, 30)[1], false);
                 };
-                if (price - rangeHigh > 8)
+                if (price - rangeHigh > (32*TickSize))
                 {
                     SetStopLoss("Long Base", CalculationMode.Ticks, Stop * 2 * TickSize, false);
                     SetStopLoss("Long Runner",CalculationMode.Ticks, Stop * 2 * TickSize,false);
