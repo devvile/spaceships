@@ -188,7 +188,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             if (ToTime(Time[0]) >= _rthEndTime && Position.MarketPosition == MarketPosition.Long)
             {
-                ExitLong("Exit Long After RTH", "Long Base");
+          //      ExitLong("Exit Long After RTH", "Long Base");
                 ExitLong("Exit Long After RTH", "Long Runner");
        //         ExitLong("Exit Long After RTH", "Addon");
             };
@@ -270,14 +270,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                         {
                             posSize = (LotSize2 / 3);
                         }
-                //       if ((posSize + LotSize1) * stopSize * 5 < MaxStop)
+                      if (posSize * stopSize * 5 < MaxStop)
                         {
                             int _nr = rnd.Next();
                             string rando = Convert.ToString(_nr);
                             string name = "tag " + rando;
                             _breakoutValid = true;
                             Draw.ArrowUp(this, name, true, 0, Low[0] - 4 * TickSize, Brushes.Blue);
-                             _longOneOrder = EnterLong(LotSize1, "Long Base");
+            //                 _longOneOrder = EnterLong(LotSize1, "Long Base");
                             _longTwoOrder = EnterLong(posSize, "Long Runner");
                         }
 
@@ -294,7 +294,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                     if (noPositions())
                     {
-                        SetStopLoss("Long Base", CalculationMode.Ticks, 40, false);
+        //                SetStopLoss("Long Base", CalculationMode.Ticks, 40, false);
                         SetStopLoss("Long Runner", CalculationMode.Ticks, 40, false);
                         status = "Flat";
                     }
@@ -357,19 +357,19 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (status == "Level")
             {
                 SetStopLoss("Long Runner",CalculationMode.Price, rangeHigh-1,false);
-                SetStopLoss("Long Base",CalculationMode.Price, rangeHigh-1,false);
+      //          SetStopLoss("Long Base",CalculationMode.Price, rangeHigh-1,false);
 
             } 
              if (status == "Breakeven")
             {
                 SetStopLoss("Long Runner", CalculationMode.Price, entryPrice, false);
-                SetStopLoss("Long Base", CalculationMode.Price, entryPrice, false);
+        //        SetStopLoss("Long Base", CalculationMode.Price, entryPrice, false);
   //              SetStopLoss("Addon", CalculationMode.Price, entryPrice, false);
             }
                 if (status == "Trail2")
             {
                SetStopLoss("Long Runner", CalculationMode.Price, Bollinger(2, 10).Lower[0] - atrValue/2, false);
-               SetStopLoss("Long Base", CalculationMode.Price, Bollinger(2, 10).Lower[0] - atrValue/2, false);
+          //     SetStopLoss("Long Base", CalculationMode.Price, Bollinger(2, 10).Lower[0] - atrValue/2, false);
 //               SetStopLoss("Addon", CalculationMode.Price, Bollinger(2, 10).Lower[0] - atrValue / 2, false);
 
             }
@@ -428,25 +428,26 @@ namespace NinjaTrader.NinjaScript.Strategies
                 };
                 if (price - rangeHigh > (32*TickSize))
                 {
-                    SetStopLoss("Long Base", CalculationMode.Ticks, Stop * 2 * TickSize, false);
+           //       SetStopLoss("Long Base", CalculationMode.Ticks, Stop * 2 * TickSize, false);
                     SetStopLoss("Long Runner",CalculationMode.Ticks, Stop * 2 * TickSize,false);
                 }
                 else
                 {
-                    SetStopLoss("Long Base", CalculationMode.Price, todayGlobexHigh - (Stop * TickSize),false);
+              //      SetStopLoss("Long Base", CalculationMode.Price, todayGlobexHigh - (Stop * TickSize),false);
                     SetStopLoss("Long Runner", CalculationMode.Price, todayGlobexHigh - (Stop * TickSize),false);
                 }
 
-                if (execution.Order == _longOneOrder)
+                if (execution.Order == _longTwoOrder)
                 {
                     _longEntryPrice1 = price;
                     status = "Long Default";
                 }
+                /*
                 else if (execution.Order == _longTwoOrder)
                 {
                     _longEntryPrice1 = price;
                     status = "Long Default";
-                }
+                }*/
 
             }
         }
