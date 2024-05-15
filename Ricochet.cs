@@ -370,7 +370,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
                 if (status == "Trail2")
             {
-               SetStopLoss("Long Runner", CalculationMode.Price, Bollinger(2, 10).Lower[0] - atrValue/2, false);
+               SetStopLoss("Long Runner", CalculationMode.Price, Bollinger(2, 10).Lower[0] - atrValue/2 , false);
           //     SetStopLoss("Long Base", CalculationMode.Price, Bollinger(2, 10).Lower[0] - atrValue/2, false);
 //               SetStopLoss("Addon", CalculationMode.Price, Bollinger(2, 10).Lower[0] - atrValue / 2, false);
 
@@ -429,6 +429,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                  //   SetStopLoss("Long Runner", CalculationMode.Price, KAMA(BarsArray[0], 10, 14, 30)[1], false);
                 };
+                /*
                 if (price - rangeHigh > (32*TickSize))
                 {
            //       SetStopLoss("Long Base", CalculationMode.Ticks, Stop * 2 * TickSize, false);
@@ -436,10 +437,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                     SetStopLoss("Long Runner",CalculationMode.Ticks, Stop2 * 2,false);
                 }
                 else
-                {
+                {*/
               //      SetStopLoss("Long Base", CalculationMode.Price, todayGlobexHigh - (Stop * TickSize),false);
                     SetStopLoss("Long Runner", CalculationMode.Price, todayGlobexHigh - (Stop1 * TickSize),false);
-                }
+                
 
                 if (execution.Order == _longTwoOrder)
                 {
@@ -459,13 +460,9 @@ namespace NinjaTrader.NinjaScript.Strategies
         private double CalculateStopLoss()
         {
             double stopLoss = 0;
-            if (Close[0] - rangeHigh > 32 * TickSize){
-                stopLoss = Stop2 * 2;
-            }
-            else
-            {
+            
                 stopLoss = Close[0] - (todayGlobexHigh - Stop1 * TickSize);
-            }
+            
             return stopLoss;
         }
 
