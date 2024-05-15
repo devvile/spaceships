@@ -428,8 +428,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 };
                 if (price - rangeHigh > (32*TickSize))
                 {
-                    SetStopLoss("Long Base", CalculationMode.Ticks, Stop * 2 * TickSize, false);
-                    SetStopLoss("Long Runner",CalculationMode.Ticks, Stop * 2 * TickSize,false);
+                    SetStopLoss("Long Base", CalculationMode.Ticks, Stop  * 1.5 , false);
+                    SetStopLoss("Long Runner",CalculationMode.Ticks, Stop *1.5 ,false);
                 }
                 else
                 {
