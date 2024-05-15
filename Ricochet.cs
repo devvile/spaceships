@@ -63,12 +63,12 @@ namespace NinjaTrader.NinjaScript.Strategies
         double todayIBHigh;
         double todayIBLow;
         private double _aroonUp;
-        private int _barsToCheck;
         private double _longStopMargin;
         private double _shortStopMargin;
         private double _atrTargetRatio;
         private double shortPrice;
         private int _atrPeriod = 14;
+        private int _maxStop = 500;
         private double rvolTreshold;
         #endregion
 
@@ -114,7 +114,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Name = "Ricochet";
                 Calculate = Calculate.OnBarClose;
                 BarsRequiredToTrade = 60;
-                _barsToCheck = 60;
                 lastResetTime = DateTime.MinValue;
                 _numberOfRetests = 1;
                 _breakoutValid = false;
@@ -151,7 +150,6 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Calculate = Calculate.OnBarClose;
 
                 RealtimeErrorHandling = RealtimeErrorHandling.IgnoreAllErrors;
-                BarsRequiredToTrade = BarsToCheck;
                 Levels4 myLevels4 = Levels4();
                 AddChartIndicator(myLevels4);
 
@@ -239,6 +237,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     if (Closes[0][0] >= rangeHigh + (TickSize * breakoutTreshold) && !_breakoutValid && noPositions() && rangeHigh-todayGlobexHigh < 25 && retestCount < numberOfRetests) 
                     {
                         int posSize = 0;
+                        /*
                         if(rangeHigh - todayGlobexHigh < atrValue * 2)
                         {
                             posSize = LotSize2;
@@ -250,14 +249,38 @@ namespace NinjaTrader.NinjaScript.Strategies
                         else
                         {
                             posSize = (LotSize2 / 3);
+                        }*/
+                        double stopSize = CalculateStopLoss();
+                        Print(Time[0]);
+                        Print(CalculateStopLoss());
+
+                        if (rangeHigh - todayGlobexHigh <= atrValue)
+                        {
+                            posSize = LotSize2 + 1;
                         }
-                        int _nr = rnd.Next();
-                        string rando = Convert.ToString(_nr);
-                        string name = "tag " + rando;
-                        _breakoutValid = true;
-                        Draw.ArrowUp(this, name, true, 0, Low[0] - 4 * TickSize, Brushes.Blue);
-                        _longOneOrder = EnterLong(LotSize1, "Long Base");
-                        _longTwoOrder = EnterLong(posSize, "Long Runner");
+                       else if (rangeHigh - todayGlobexHigh <= atrValue * 2)
+                        {
+                            posSize = LotSize2;
+                        }
+                        else if (rangeHigh - todayGlobexHigh <= atrValue * 4)
+                        {
+                            posSize = LotSize2 / 2;
+                        }
+                        else
+                        {
+                            posSize = (LotSize2 / 3);
+                        }
+                //       if ((posSize + LotSize1) * stopSize * 5 < MaxStop)
+                        {
+                            int _nr = rnd.Next();
+                            string rando = Convert.ToString(_nr);
+                            string name = "tag " + rando;
+                            _breakoutValid = true;
+                            Draw.ArrowUp(this, name, true, 0, Low[0] - 4 * TickSize, Brushes.Blue);
+                             _longOneOrder = EnterLong(LotSize1, "Long Base");
+                            _longTwoOrder = EnterLong(posSize, "Long Runner");
+                        }
+
                     }
 
                     if (Closes[0][0] <= rangeLow - (TickSize * breakoutTreshold) && !_breakoutValid && noPositions()) 
@@ -307,7 +330,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private void Trail()
         {
-            Print("Trailing");
             double entryPrice = _longEntryPrice1;
             double currentPrice = Close[0];
 
@@ -331,12 +353,9 @@ namespace NinjaTrader.NinjaScript.Strategies
         private void AdjustStop()
         {
                 double entryPrice = _longEntryPrice1;
-                Print("in adjust Stop");
-                Print(status);
 
             if (status == "Level")
             {
-                Print("ADjusting stop on Levels");
                 SetStopLoss("Long Runner",CalculationMode.Price, rangeHigh-1,false);
                 SetStopLoss("Long Base",CalculationMode.Price, rangeHigh-1,false);
 
@@ -427,10 +446,25 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
                 else if (execution.Order == _longTwoOrder)
                 {
-         //           ExitLongLimit(LotSize2, execution.Order.AverageFillPrice + atrValue * Target2, "Profit Target2", "Long Runner");
+                    _longEntryPrice1 = price;
+                    status = "Long Default";
+                    //           ExitLongLimit(LotSize2, execution.Order.AverageFillPrice + atrValue * Target2, "Profit Target2", "Long Runner");
                 }
 
             }
+        }
+
+        private double CalculateStopLoss()
+        {
+            double stopLoss = 0;
+            if (Close[0] - rangeHigh > 32 * TickSize){
+                stopLoss = Stop * 2 * TickSize;
+            }
+            else
+            {
+                stopLoss = Close[0] - (todayGlobexHigh - Stop * TickSize);
+            }
+            return stopLoss;
         }
 
         private void AddIndicators()
@@ -492,20 +526,6 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         #region Position Management
 
-        [Display(Name = "Bars to Check", GroupName = "Position Management", Order = 0)]
-        public int BarsToCheck
-        {
-            get { return _barsToCheck; }
-            set { _barsToCheck = value; }
-        }
-
-
-        [Display(Name = "Atr Target ratio", GroupName = "Position Management", Order = 0)]
-        public double AtrTargetRatio
-        {
-            get { return _atrTargetRatio; }
-            set { _atrTargetRatio = value; }
-        }
 
         [Display(Name = "Size base", GroupName = "Position Management", Order = 0)]
         public int LotSize1
@@ -553,6 +573,13 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             get { return _atrPeriod; }
             set { _atrPeriod = value; }
+        }
+
+        [Display(Name = "Max Stop Loss ($)", GroupName = "Filters", Order = 0)]
+        public int MaxStop
+        {
+            get { return _maxStop; }
+            set { _maxStop = value; }
         }
 
 
