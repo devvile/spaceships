@@ -232,6 +232,22 @@ namespace NinjaTrader.NinjaScript.Strategies
                         rangeLow = todayIBLow;
                     }
 
+                    if (noPositions())
+                    {
+                        SetStopLoss("Long Runner", CalculationMode.Ticks, 40, false);
+                        status = "Flat";
+                    }
+                    else
+                    {
+                        Trail();
+
+                        if (status == "Breakeven" && !noPositions())
+                        {
+                            //          EnterLong(2, "Addon");
+                        }
+
+                        AdjustStop();
+                    };
 
                     //check if breakout was valid
                     if (Closes[0][0] >= rangeHigh + (TickSize * breakoutTreshold) && !_breakoutValid && noPositions() && rangeHigh-todayGlobexHigh < 25 && retestCount < numberOfRetests) 
@@ -292,23 +308,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         Draw.ArrowDown(this, name, true, 0, High[0] + 4 * TickSize, Brushes.Red);
                     }
 
-                    if (noPositions())
-                    {
-        //                SetStopLoss("Long Base", CalculationMode.Ticks, 40, false);
-                        SetStopLoss("Long Runner", CalculationMode.Ticks, 40, false);
-                        status = "Flat";
-                    }
-                    else
-                    {
-                        Trail();
-
-                        if (status == "Breakeven" && !noPositions())
-                        {
-                 //          EnterLong(2, "Addon");
-                        }
-
-                        AdjustStop();   
-                    };
+          
 
 
                     if (_breakoutValid)
@@ -336,8 +336,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 if (Close[0] >= entryPrice + (atrValue * 0.75) && status != "Breakeven" && status != "Trail2" && status != "Level" && !(entryPrice - rangeHigh > 8))
                 {
-                    status = "Level";
-                }
+            }
                 if (Close[0] >= entryPrice + atrValue * 2  && status != "Breakeven" && status !="Trail2")
                 {
                     status = "Breakeven";
@@ -356,6 +355,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             if (status == "Level")
             {
+
                 SetStopLoss("Long Runner",CalculationMode.Price, rangeHigh-1,false);
       //          SetStopLoss("Long Base",CalculationMode.Price, rangeHigh-1,false);
 
@@ -422,14 +422,16 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             if (OrderFilled(execution.Order)) //moze to jest problemem
             {
-                if(execution.Order.Name == "Profit target")
+                todayGlobexHigh = Levels4().GetTodayGlobexHigh();
+                if (execution.Order.Name == "Profit target")
                 {
                  //   SetStopLoss("Long Runner", CalculationMode.Price, KAMA(BarsArray[0], 10, 14, 30)[1], false);
                 };
                 if (price - rangeHigh > (32*TickSize))
                 {
            //       SetStopLoss("Long Base", CalculationMode.Ticks, Stop * 2 * TickSize, false);
-                    SetStopLoss("Long Runner",CalculationMode.Ticks, Stop * 2 * TickSize,false);
+
+                    SetStopLoss("Long Runner",CalculationMode.Ticks, Stop * 2,false);
                 }
                 else
                 {
