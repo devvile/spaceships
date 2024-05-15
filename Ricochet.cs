@@ -440,15 +440,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (execution.Order == _longOneOrder)
                 {
                     _longEntryPrice1 = price;
-               //     SetProfitTarget("Long Base", CalculationMode.Price, execution.Order.AverageFillPrice + atrValue * Target1);
-             //         ExitLongLimit(0,true,LotSize1, execution.Order.AverageFillPrice + atrValue * Target1, "Profit Target1", "Long Base");
                     status = "Long Default";
                 }
                 else if (execution.Order == _longTwoOrder)
                 {
                     _longEntryPrice1 = price;
                     status = "Long Default";
-                    //           ExitLongLimit(LotSize2, execution.Order.AverageFillPrice + atrValue * Target2, "Profit Target2", "Long Runner");
                 }
 
             }
