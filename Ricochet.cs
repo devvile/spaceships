@@ -45,7 +45,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         int _IbEndTime;
         double rangeHigh;
         double rangeLow;
-        public int _stop;
+        public int _stop1; //from globex
+        public int _stop2; //from position
         public int _target1;
         public int _target2;
 
@@ -118,7 +119,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 _numberOfRetests = 1;
                 _breakoutValid = false;
                 rvolTreshold = 1.5;
-                _stop = 12;
+                _stop1 = 12;
                 _target1 = 4;
                 _target2 = 10;
 
@@ -336,7 +337,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 if (Close[0] >= entryPrice + (atrValue * 0.75) && status != "Breakeven" && status != "Trail2" && status != "Level" && !(entryPrice - rangeHigh > 8))
                 {
-            }
+                status = "Level";
+                }
                 if (Close[0] >= entryPrice + atrValue * 2  && status != "Breakeven" && status !="Trail2")
                 {
                     status = "Breakeven";
@@ -431,12 +433,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
            //       SetStopLoss("Long Base", CalculationMode.Ticks, Stop * 2 * TickSize, false);
 
-                    SetStopLoss("Long Runner",CalculationMode.Ticks, Stop * 2,false);
+                    SetStopLoss("Long Runner",CalculationMode.Ticks, Stop2 * 2,false);
                 }
                 else
                 {
               //      SetStopLoss("Long Base", CalculationMode.Price, todayGlobexHigh - (Stop * TickSize),false);
-                    SetStopLoss("Long Runner", CalculationMode.Price, todayGlobexHigh - (Stop * TickSize),false);
+                    SetStopLoss("Long Runner", CalculationMode.Price, todayGlobexHigh - (Stop1 * TickSize),false);
                 }
 
                 if (execution.Order == _longTwoOrder)
@@ -458,11 +460,11 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             double stopLoss = 0;
             if (Close[0] - rangeHigh > 32 * TickSize){
-                stopLoss = Stop * 2 * TickSize;
+                stopLoss = Stop2 * 2;
             }
             else
             {
-                stopLoss = Close[0] - (todayGlobexHigh - Stop * TickSize);
+                stopLoss = Close[0] - (todayGlobexHigh - Stop1 * TickSize);
             }
             return stopLoss;
         }
@@ -557,11 +559,18 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 
 
-        [Display(Name = "Stop (Ticks)", GroupName = "Position Management", Order = 0)]
-        public int Stop
+        [Display(Name = "Stop  From  Globex (Ticks)", GroupName = "Position Management", Order = 0)]
+        public int Stop1
         {
-            get { return _stop; }
-            set { _stop = value; }
+            get { return _stop1; }
+            set { _stop1 = value; }
+        }
+
+        [Display(Name = "Stop  From Entry (Ticks)", GroupName = "Position Management", Order = 0)]
+        public int Stop2
+        {
+            get { return _stop2; }
+            set { _stop2 = value; }
         }
 
         #endregion
