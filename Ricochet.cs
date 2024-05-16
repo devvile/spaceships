@@ -48,6 +48,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         public int _stop;
         public int _target1;
         public int _target2;
+        private int _stopFromPosition;
 
         private Order _longOneOrder;
         private Order _longTwoOrder;
@@ -57,7 +58,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private Indicator _aroonSlow;
         private Indicator _aroonMid;
 
-
+        private int _stopFromPostion;
         double todayGlobexHigh;
         double todayGlobexLow;
         double todayIBHigh;
@@ -232,9 +233,25 @@ namespace NinjaTrader.NinjaScript.Strategies
                         rangeLow = todayIBLow;
                     }
 
+                                  if (noPositions())
+                    {
+                        SetStopLoss("Long Base", CalculationMode.Ticks, 40, false);
+                        SetStopLoss("Long Runner", CalculationMode.Ticks, 40, false);
+                        status = "Flat";
+                    }
+                    else
+                    {
+                        Trail();
 
+                        if (status == "Breakeven" && !noPositions())
+                        {
+                 //          EnterLong(2, "Addon");
+                        }
+
+                        AdjustStop();   
+                    };
                     //check if breakout was valid
-                    if (Closes[0][0] >= rangeHigh + (TickSize * breakoutTreshold) && !_breakoutValid && noPositions() && rangeHigh-todayGlobexHigh < 25 && retestCount < numberOfRetests) 
+                    if (Closes[0][0] >= rangeHigh + (TickSize * breakoutTreshold) && !_breakoutValid && noPositions() && rangeHigh-todayGlobexHigh < 25 && retestCount < numberOfRetests )// !(Close[0] - rangeHigh > (32 * TickSize)))  
                     {
                         int posSize = 0;
                         /*
@@ -251,8 +268,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                             posSize = (LotSize2 / 3);
                         }*/
                         double stopSize = CalculateStopLoss();
-                        Print(Time[0]);
-                        Print(CalculateStopLoss());
+               
+               //         PrintCalculateStopLoss());
 
                         if (rangeHigh - todayGlobexHigh <= atrValue)
                         {
@@ -270,7 +287,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         {
                             posSize = (LotSize2 / 3);
                         }
-                //       if ((posSize + LotSize1) * stopSize * 5 < MaxStop)
+                    //       if ((posSize + LotSize1) * stopSize * 5 < MaxStop)
                         {
                             int _nr = rnd.Next();
                             string rando = Convert.ToString(_nr);
@@ -292,23 +309,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         Draw.ArrowDown(this, name, true, 0, High[0] + 4 * TickSize, Brushes.Red);
                     }
 
-                    if (noPositions())
-                    {
-                        SetStopLoss("Long Base", CalculationMode.Ticks, 40, false);
-                        SetStopLoss("Long Runner", CalculationMode.Ticks, 40, false);
-                        status = "Flat";
-                    }
-                    else
-                    {
-                        Trail();
-
-                        if (status == "Breakeven" && !noPositions())
-                        {
-                 //          EnterLong(2, "Addon");
-                        }
-
-                        AdjustStop();   
-                    };
+      
 
 
                     if (_breakoutValid)
@@ -342,7 +343,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 {
                     status = "Breakeven";
                 }
-                if (High[0] >= entryPrice + atrValue * Target1  && status == "Breakeven" )
+                if (High[0] >= entryPrice + atrValue * Target1  && status == "Breakeven" ) // <to tez ciekawe
                 {
 
                     status = "Trail2";
@@ -422,26 +423,47 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             if (OrderFilled(execution.Order)) //moze to jest problemem
             {
+                /*
                 if(execution.Order.Name == "Profit target")
                 {
                  //   SetStopLoss("Long Runner", CalculationMode.Price, KAMA(BarsArray[0], 10, 14, 30)[1], false);
                 };
-                if (price - rangeHigh > (32*TickSize))
+                */
+                if(execution.Order.OrderAction == OrderAction.Buy)
                 {
-                    SetStopLoss("Long Base", CalculationMode.Ticks, Stop  * 1.5 , false);
-                    SetStopLoss("Long Runner",CalculationMode.Ticks, Stop *1.5 ,false);
+                    if (price - rangeHigh > (32 * TickSize))
+                    {
+                        double entryPrice = price - (atrValue / 4);
+                        SetStopLoss("Long Base", CalculationMode.Price, entryPrice, false);
+                        SetStopLoss("Long Runner", CalculationMode.Price, entryPrice, false);
+                    }
+                    else
+                    {
+                        double entryPrice = todayGlobexHigh - (atrValue / 6);
+                        SetStopLoss("Long Base", CalculationMode.Price, entryPrice, false);
+                        SetStopLoss("Long Runner", CalculationMode.Price, entryPrice, false);
+                    }
                 }
-                else
+                else if(execution.Order.Name == "Stop loss")// && (status == "Trail2" || status =="Breakeven")) //stop hit
                 {
-                    SetStopLoss("Long Base", CalculationMode.Price, todayGlobexHigh - (Stop * TickSize),false);
-                    SetStopLoss("Long Runner", CalculationMode.Price, todayGlobexHigh - (Stop * TickSize),false);
+                    if (price - rangeHigh > (32 * TickSize))
+                    {
+            //           SetStopLoss("Long Base", CalculationMode.Ticks, StopFromPosition * TickSize, false);
+               //        SetStopLoss("Long Runner", CalculationMode.Ticks, StopFromPosition * TickSize, false);
+          //              SetStopLoss("Long Base", CalculationMode.Ticks, Stop * 2 * TickSize, false);
+          //              SetStopLoss("Long Runner", CalculationMode.Ticks, Stop * 2 * TickSize, false);
+                    }
+                    else
+                    {
+            //            SetStopLoss("Long Base", CalculationMode.Price, todayGlobexHigh - (Stop * TickSize), false);
+             //           SetStopLoss("Long Runner", CalculationMode.Price, todayGlobexHigh - (Stop * TickSize), false);
+                    }
                 }
+
 
                 if (execution.Order == _longOneOrder)
                 {
                     _longEntryPrice1 = price;
-               //     SetProfitTarget("Long Base", CalculationMode.Price, execution.Order.AverageFillPrice + atrValue * Target1);
-             //         ExitLongLimit(0,true,LotSize1, execution.Order.AverageFillPrice + atrValue * Target1, "Profit Target1", "Long Base");
                     status = "Long Default";
                 }
                 else if (execution.Order == _longTwoOrder)
@@ -458,11 +480,11 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             double stopLoss = 0;
             if (Close[0] - rangeHigh > 32 * TickSize){
-                stopLoss = Stop * 2 * TickSize;
+                stopLoss = Close[0]  - (atrValue / 4);
             }
             else
             {
-                stopLoss = Close[0] - (todayGlobexHigh - Stop * TickSize);
+                stopLoss = Close[0] - (todayGlobexHigh - (atrValue / 6));
             }
             return stopLoss;
         }
@@ -557,11 +579,18 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 
 
-        [Display(Name = "Stop (Ticks)", GroupName = "Position Management", Order = 0)]
+        [Display(Name = "Stop from Globex (Ticks)", GroupName = "Position Management", Order = 0)]
         public int Stop
         {
             get { return _stop; }
             set { _stop = value; }
+        }
+
+        [Display(Name = "Stop from Position (Ticks)", GroupName = "Position Management", Order = 0)]
+        public int StopFromPosition
+        {
+            get { return _stopFromPosition; }
+            set { _stopFromPosition = value; }
         }
 
         #endregion
