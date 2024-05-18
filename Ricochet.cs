@@ -184,6 +184,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 retestCount = 0;
                 lastResetTime = Time[0];
+                _breakoutValid = false;
             }
 
             CalculateTradeTime();
@@ -193,6 +194,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 ExitLong("Exit Long After RTH", "addon");
                 ExitLong("Exit Long After RTH", "Long Main");
+                _breakoutValid = false;
             };
 
 
@@ -260,13 +262,19 @@ namespace NinjaTrader.NinjaScript.Strategies
                         UpdateLotSizeBasedOnProfit();
                     };
                     //check if breakout was valid
-                    if (Closes[0][0] >= rangeHigh + (TickSize * breakoutTreshold) && !_breakoutValid && noPositions()  && retestCount < numberOfRetests &&  rangeHigh-todayGlobexHigh < 25  && previousCandleRed())
+                    if (Closes[0][0] >= rangeHigh + (TickSize * breakoutTreshold) && !_breakoutValid  && retestCount < numberOfRetests )
                     {
                         _breakoutValid = true;
+                        int _nr = rnd.Next();
+                        string rando = Convert.ToString(_nr);
+                        string name = "tag " + rando;
+                        Draw.ArrowUp(this, name, true, 0, Low[0] - 4 * TickSize, Brushes.Blue);
+                    }
+                    if(_breakoutValid  && Close[0] - rangeHigh < atrValue && noPositions() && retestCount < numberOfRetests && Close[0] - todayGlobexHigh < 15 )
+                    { 
 
                         int posSize = 0;
                         double stopSize = CalculateStopLoss();
-      
 
                         if (rangeHigh - todayGlobexHigh <= atrValue)
                         {
@@ -285,14 +293,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                             posSize = (LotSize1 / 3);
                         }
                         posSize = posSize > MaxLotSize ? MaxLotSize : posSize;
-                      if (posSize * stopSize * 5 < MaxStop)
-                        {
-                            int _nr = rnd.Next();
-                            string rando = Convert.ToString(_nr);
-                            string name = "tag " + rando;
-                            _breakoutValid = true;
-                            Draw.ArrowUp(this, name, true, 0, Low[0] - 4 * TickSize, Brushes.Blue);
-                            _longOneOrder = EnterLong(posSize, "Long Main");
+                        if (posSize * stopSize * 5 < MaxStop)
+                            {
+                
+                                _longOneOrder = EnterLong(posSize, "Long Main");
+                               retestCount++;
                         }
 
                     }
@@ -303,14 +308,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                         string rando = Convert.ToString(_nr);
                         string name = "tag " + rando;
                         _breakoutValid = true;
+                        retestCount++;
                         Draw.ArrowDown(this, name, true, 0, High[0] + 4 * TickSize, Brushes.Red);
                 //        EnterShort("Just short",1);
-                    }
-                    
-                    if (_breakoutValid)
-                    {
-                        retestCount++;
-                        _breakoutValid = false;
                     }
 
                 }
@@ -333,7 +333,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             double accountProfit = SystemPerformance.AllTrades.TradesPerformance.Currency.CumProfit;
             int additionalLots = (int)(accountProfit / AmountForSizeUp);
-                int potentialLotSize = LotSize1 + additionalLots;
+            int potentialLotSize = LotSize1 + additionalLots;
             LotSize1 = potentialLotSize > MaxLotSize ?  MaxLotSize : potentialLotSize;
         }
 
@@ -459,6 +459,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (execution.Order.Name == "Long Main" && execution.Order.OrderState == OrderState.Filled && execution.Order.OrderAction ==OrderAction.Sell)
             {
                 _isLongMainStopped = true; // Set the flag if "Long Main" is stopped
+                _breakoutValid = false;
             }
         }
 
