@@ -259,12 +259,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                     {
                         int posSize = 0;
                         double stopSize = CalculateStopLoss();
-                        Print(Time[0]);
-                        Print(Math.Round(stopSize,1));
+      
 
                         if (rangeHigh - todayGlobexHigh <= atrValue)
                         {
-                            posSize = LotSize1 + 3;
+                            posSize = (int)(LotSize1 * 1.5);
                         }
                        else if (rangeHigh - todayGlobexHigh <= atrValue * 2)
                         {
@@ -278,6 +277,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         {
                             posSize = (LotSize1 / 3);
                         }
+                        posSize = posSize > MaxLotSize ? MaxLotSize : posSize;
                       if (posSize * stopSize * 5 < MaxStop)
                         {
                             int _nr = rnd.Next();
@@ -289,7 +289,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         }
 
                     }
-
+                    
                     if (Closes[0][0] <= rangeLow - (TickSize * breakoutTreshold) && !_breakoutValid && noPositions()) 
                     {
                         int _nr = rnd.Next();
@@ -297,8 +297,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                         string name = "tag " + rando;
                         _breakoutValid = true;
                         Draw.ArrowDown(this, name, true, 0, High[0] + 4 * TickSize, Brushes.Red);
+                //        EnterShort("Just short",1);
                     }
-
+                    
                     if (_breakoutValid)
                     {
                         retestCount++;
@@ -441,6 +442,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 if (execution.Order.Name == "addon")
                 {
+
                     addonOrders.Add(execution.Order); // Add addon orders to the list
                 }
             }
@@ -464,9 +466,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 stopLoss = Close[0] - (todayGlobexHigh - (atrValue / StopLevel));
             }
 
-            // delete above
-            //    stopLoss = Close[0] - (todayGlobexHigh - StopLevel * TickSize);
-            
+ 
             return stopLoss;
         }
 
