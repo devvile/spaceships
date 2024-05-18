@@ -47,10 +47,14 @@ namespace NinjaTrader.NinjaScript.Strategies
         public int _StopPosition; //from position
         public int _target1;
         public int _target2;
+        private bool _isLongMainStopped; 
 
         private Order _longOneOrder;
         private Indicator _atr;
 
+        private bool _addSize;
+
+        private List<Order> addonOrders; 
 
         double todayGlobexHigh;
         double todayGlobexLow;
@@ -62,6 +66,9 @@ namespace NinjaTrader.NinjaScript.Strategies
         private int _atrPeriod = 14;
         private int _maxStop = 500;
         private double rvolTreshold;
+        private int _amountForSizeUp;
+
+        private Account account;
         #endregion
 
         #region My Parameters
@@ -79,12 +86,16 @@ namespace NinjaTrader.NinjaScript.Strategies
         private double _longEntryPrice1;
 
         private int _lotSize1;
+        private int LotSize1;
 
-
+        private bool _useAddon;
 
         private bool _useLongs = true;
         private bool _useShorts = true;
         private bool _canTrade = false;
+        private int _initialLotSize;
+        private int initialLotSize;
+        private int _maxLotSize;
 
 
         private int BarNr = 0;  //sprawdzic <-----
@@ -92,9 +103,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         private string status;
 
-
         #endregion
-
+        // ADDONY NIE LAPIA STOPA
 
         protected override void OnStateChange()
         {
@@ -112,7 +122,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 _StopLevel = 12;
                 _target1 = 4;
                 _target2 = 10;
-
+                _maxLotSize = 30;
 
                 DateRanges = new List<DateRange>
                     {
@@ -137,18 +147,19 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 ClearOutputWindow();
                 EntryHandling = EntryHandling.AllEntries;
-                EntriesPerDirection = 6;
                 Calculate = Calculate.OnBarClose;
 
                 RealtimeErrorHandling = RealtimeErrorHandling.IgnoreAllErrors;
                 Levels4 myLevels4 = Levels4();
                 AddChartIndicator(myLevels4);
-
+                _isLongMainStopped = false;
+                addonOrders = new List<Order>();
                 AddDataSeries(BarsPeriodType.Minute, 15);
             }
             else if (State == State.DataLoaded)
             {
                 ClearOutputWindow();
+                account = Account;
                 AddIndicators();
                 Calculate = Calculate.OnBarClose;
             }
@@ -161,6 +172,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (CurrentBars[0] < BarsRequiredToTrade || CurrentBars[1] < BarsRequiredToTrade)
                 return;
 
+            LotSize1 = UserLotSize;
 
             int intDate = ToDay(Time[0]); // Get integer representation of the date
             bool isSpecialPeriod = DateRanges.Any(range => range.Contains(intDate));
@@ -179,6 +191,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             if (ToTime(Time[0]) >= _rthEndTime && Position.MarketPosition == MarketPosition.Long)
             {
+                ExitLong("Exit Long After RTH", "addon");
                 ExitLong("Exit Long After RTH", "Long Main");
             };
 
@@ -228,27 +241,30 @@ namespace NinjaTrader.NinjaScript.Strategies
                     }
                     else
                     {
+
+
                         Trail();
-
-                        if (status == "Breakeven" && !noPositions())
+                                                if (status == "Trail2" && !noPositions() && previousCandleRed() && Aroon(10).Up[0] > 70 && Aroon(10).Down[0] < 35 &&  !_isLongMainStopped && useAddon)// && StochRSI(14)[0]<=0.2)
                         {
-             
+                            EnterLong(1, "addon");
                         }
-
                         AdjustStop();
                     };
-
+                    if (addSize)
+                    {
+                        UpdateLotSizeBasedOnProfit();
+                    };
                     //check if breakout was valid
-                    if (Closes[0][0] >= rangeHigh + (TickSize * breakoutTreshold) && !_breakoutValid && noPositions()  && retestCount < numberOfRetests &&  rangeHigh-todayGlobexHigh < 25 )
+                    if (Closes[0][0] >= rangeHigh + (TickSize * breakoutTreshold) && !_breakoutValid && noPositions()  && retestCount < numberOfRetests &&  rangeHigh-todayGlobexHigh < 25  && previousCandleRed())
                     {
                         int posSize = 0;
                         double stopSize = CalculateStopLoss();
                         Print(Time[0]);
-                        Print(CalculateStopLoss());
+                        Print(Math.Round(stopSize,1));
 
                         if (rangeHigh - todayGlobexHigh <= atrValue)
                         {
-                            posSize = LotSize1 + 2;
+                            posSize = LotSize1 + 3;
                         }
                        else if (rangeHigh - todayGlobexHigh <= atrValue * 2)
                         {
@@ -300,6 +316,21 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         }
 
+        private void UpdateLotSizeBasedOnProfit()
+        { if (account == null)
+            {
+             //   Print("Account object is not initialized.");
+                return;
+            }
+
+            double accountProfit = SystemPerformance.AllTrades.TradesPerformance.Currency.CumProfit;
+       //     Print("Account Realized Profit/Loss: " + accountProfit);
+            int additionalLots = (int)(accountProfit / AmountForSizeUp);
+  //          Print(accountProfit);
+                int potentialLotSize = LotSize1 + additionalLots;
+            LotSize1 = potentialLotSize > MaxLotSize ?  MaxLotSize : potentialLotSize;
+        }
+
         private void Trail()
         {
             double entryPrice = _longEntryPrice1;
@@ -339,10 +370,17 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
                 if (status == "Trail2")
             {
-               SetStopLoss("Long Main", CalculationMode.Price, Bollinger(2, 10).Lower[0] - atrValue/2 , false);
+
+                double stopPrice = Bollinger(2, 10).Lower[0] - atrValue / 2;
+                SetStopLoss("Long Main", CalculationMode.Price, stopPrice, false);
+
+                foreach (var order in addonOrders)
+                {
+                    SetStopLoss(order.Name, CalculationMode.Price, stopPrice, false);
+                }
             }
 
-               
+
         }
 
         private void CalculateTradeTime()
@@ -370,8 +408,6 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
 
 
-
-
         private bool noPositions()
         {
             return Position.MarketPosition == MarketPosition.Flat;
@@ -386,32 +422,35 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         protected override void OnExecutionUpdate(Execution execution, string executionId, double price, int quantity, MarketPosition marketPosition, string orderId, DateTime time)
         {
-
-
-            if (OrderFilled(execution.Order)) //moze to jest problemem
+            if (OrderFilled(execution.Order) && execution.Order.Name != "Stop loss") //moze to jest problemem
             {
                 todayGlobexHigh = Levels4().GetTodayGlobexHigh();
-
-                
-                if (price - rangeHigh > (32*TickSize))
+                if (price - rangeHigh > 32 * TickSize)
                 {
-                    SetStopLoss("Long Main", CalculationMode.Price, price - atrValue/ StopPosition, false);
-                //           SetStopLoss("Long Main",CalculationMode.Ticks, StopPosition,false);
+                    SetStopLoss("Long Main", CalculationMode.Price, price -( atrValue / StopPosition), false);
                 }
                 else
-              
-                    SetStopLoss("Long Main", CalculationMode.Price, todayGlobexHigh - (StopLevel * TickSize),false);
-                
+                    SetStopLoss("Long Main", CalculationMode.Price, todayGlobexHigh - (atrValue / StopLevel), false);
 
-                if (execution.Order == _longOneOrder)
+                if (execution.Order == _longOneOrder && execution.Order.OrderAction == OrderAction.Buy)
                 {
                     _longEntryPrice1 = price;
+                    _isLongMainStopped = false;
                     status = "Long Default";
                 }
+
+                if (execution.Order.Name == "addon")
+                {
+                    addonOrders.Add(execution.Order); // Add addon orders to the list
+                }
+            }
+            if (execution.Order.Name == "Long Main" && execution.Order.OrderState == OrderState.Filled && execution.Order.OrderAction ==OrderAction.Sell)
+            {
+                _isLongMainStopped = true; // Set the flag if "Long Main" is stopped
             }
         }
 
-        private double CalculateStopLoss()
+            private double CalculateStopLoss()
         {
             double stopLoss = 0;
 
@@ -422,7 +461,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             else
             {
-                stopLoss = Close[0] - (todayGlobexHigh - StopLevel * TickSize);
+                stopLoss = Close[0] - (todayGlobexHigh - (atrValue / StopLevel));
             }
 
             // delete above
@@ -492,11 +531,41 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 
         [Display(Name = "Size base", GroupName = "Position Management", Order = 0)]
-        public int LotSize1
+        public int UserLotSize
         {
-            get { return _lotSize1; }
-            set { _lotSize1 = value; }
+            get { return _initialLotSize; }
+            set { _initialLotSize = value; }
         }
+
+        [Display(Name = "Use Addon", GroupName = "Position Management", Order = 0)]
+        public bool useAddon
+        {
+            get { return _useAddon; }
+            set { _useAddon = value; }
+        }
+
+        [Display(Name = "ADD SIZE WITH PROFIT", GroupName = "Position Management", Order = 0)]
+        public bool addSize
+        {
+            get { return _addSize; }
+            set { _addSize = value; }
+        }
+
+
+        [Display(Name = "Amount of money for SizeUP", GroupName = "Position Management", Order = 0)]
+        public int AmountForSizeUp
+        {
+            get { return _amountForSizeUp; }
+            set { _amountForSizeUp = value; }
+        }
+        [Display(Name = "Max PositionSize", GroupName = "Filters", Order = 0)]
+        public int MaxLotSize
+        {
+            get { return _maxLotSize; }
+            set { _maxLotSize = value; }
+        }
+
+
 
 
         [Display(Name = "Target Base (atr ratio)", GroupName = "Position Management", Order = 0)]
@@ -538,6 +607,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             get { return _maxStop; }
             set { _maxStop = value; }
         }
+
 
 
         #endregion
