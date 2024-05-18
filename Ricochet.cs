@@ -244,11 +244,16 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 
                         Trail();
-                                                if (status == "Trail2" && !noPositions() && previousCandleRed() && Aroon(10).Up[0] > 70 && Aroon(10).Down[0] < 35 &&  !_isLongMainStopped && useAddon)// && StochRSI(14)[0]<=0.2)
+                        if (status == "Trail2" && !noPositions() && previousCandleRed() && AroonUp() &&  !_isLongMainStopped && useAddon)// && StochRSI(14)[0]<=0.2)
                         {
                             EnterLong(1, "addon");
                         }
                         AdjustStop();
+
+                        //
+
+
+
                     };
                     if (addSize)
                     {
@@ -257,6 +262,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                     //check if breakout was valid
                     if (Closes[0][0] >= rangeHigh + (TickSize * breakoutTreshold) && !_breakoutValid && noPositions()  && retestCount < numberOfRetests &&  rangeHigh-todayGlobexHigh < 25  && previousCandleRed())
                     {
+                        _breakoutValid = true;
+
                         int posSize = 0;
                         double stopSize = CalculateStopLoss();
       
@@ -325,12 +332,15 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
 
             double accountProfit = SystemPerformance.AllTrades.TradesPerformance.Currency.CumProfit;
-       //     Print("Account Realized Profit/Loss: " + accountProfit);
             int additionalLots = (int)(accountProfit / AmountForSizeUp);
-  //          Print(accountProfit);
                 int potentialLotSize = LotSize1 + additionalLots;
             LotSize1 = potentialLotSize > MaxLotSize ?  MaxLotSize : potentialLotSize;
         }
+
+        private bool AroonUp()
+        {
+            return Aroon(10).Up[0] > 70 && Aroon(10).Down[0] < 35;
+         }
 
         private void Trail()
         {
