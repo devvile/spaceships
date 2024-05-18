@@ -270,7 +270,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         string name = "tag " + rando;
                         Draw.ArrowUp(this, name, true, 0, Low[0] - 4 * TickSize, Brushes.Blue);
                     }
-                    if(_breakoutValid  && Close[0] - rangeHigh < atrValue && noPositions() && retestCount < numberOfRetests && Close[0] - todayGlobexHigh < 15 )
+                    if(_breakoutValid  && Close[0] - rangeHigh < atrValue && noPositions() && retestCount < numberOfRetests && Close[0] - todayGlobexHigh < atrValue * 2.5 )
                     { 
 
                         int posSize = 0;
