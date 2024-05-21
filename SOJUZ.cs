@@ -70,6 +70,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private int _maxStop = 500;
         private double rvolTreshold;
         private int _amountForSizeUp;
+         private double previousRangeHigh = 0.0;
 
         private Account account;
         #endregion
@@ -237,6 +238,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     {
                         rangeLow = todayIBLow;
                     }
+                    UpdateRangeHigh();
 
                     if (noPositions())
                     {
@@ -259,7 +261,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         UpdateLotSizeBasedOnProfit();
                     };
                     //check if breakout was valid
-                    if (Closes[0][0] >= rangeHigh + (TickSize * breakoutTreshold) && !_breakoutValid && noPositions()  && retestCount < numberOfRetests &&  rangeHigh-todayGlobexHigh < 25)//  && previousCandleRed())
+                    if (Closes[0][0] >= rangeHigh + (TickSize * breakoutTreshold) && !_breakoutValid && noPositions()  && retestCount < numberOfRetests &&  rangeHigh-todayGlobexHigh < 25  && Aroon(10).Up[0] > 70 && Aroon(10).Down[0] < 35)// && previousCandleRed())
                     {
                         int posSize = 0;
                         double stopSize = CalculateStopLoss();
@@ -324,6 +326,18 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
 
 
+        }
+
+                private void UpdateRangeHigh()
+        {
+            // Store the current rangeHigh as the previous value before updating it
+            previousRangeHigh = rangeHigh;
+
+            // Check if Highs[0][10] is bigger than the calculated rangeHigh
+            if (Highs[0][10] > rangeHigh && noPositions())
+            {
+                rangeHigh = Highs[0][10];
+            }
         }
 
         private void UpdateLotSizeBasedOnProfit()
@@ -437,7 +451,15 @@ namespace NinjaTrader.NinjaScript.Strategies
                 todayGlobexHigh = Levels4().GetTodayGlobexHigh();
                 if (price - rangeHigh > 32 * TickSize)
                 {
-                    SetStopLoss("Long Main", CalculationMode.Price, rangeHigh -( atrValue / StopPosition), false);
+                    if(price-rangeHigh > atrValue * 2)
+                    {
+                        SetStopLoss("Long Main", CalculationMode.Price, price - atrValue, false);
+                    }
+                    else
+                    {
+                        SetStopLoss("Long Main", CalculationMode.Price, rangeHigh - (atrValue / StopPosition), false);
+                    }
+
                 }
                 else
                     SetStopLoss("Long Main", CalculationMode.Price, todayGlobexHigh - ((atrValue * 1.5) / StopLevel), false);
@@ -481,6 +503,8 @@ namespace NinjaTrader.NinjaScript.Strategies
  
             return stopLoss;
         }
+
+
 
         private void AddIndicators()
         {
