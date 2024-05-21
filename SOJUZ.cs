@@ -221,14 +221,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     todayIBLow = Levels4().GetTodayIBLow();
 
 
-                    if (todayGlobexHigh > todayIBHigh && noPositions())
-                    {
-                        rangeHigh = todayGlobexHigh;
-                    }
-                    else
-                    {
-                        rangeHigh = todayIBHigh;
-                    }
+            
 
                     if (todayGlobexLow < todayIBLow && noPositions())
                     {
@@ -238,19 +231,38 @@ namespace NinjaTrader.NinjaScript.Strategies
                     {
                         rangeLow = todayIBLow;
                     }
-                    UpdateRangeHigh();
-
+   
                     if (noPositions())
                     {
                         SetStopLoss("Long Main", CalculationMode.Ticks, 40, false);
                         status = "Flat";
+                        if (todayGlobexHigh > todayIBHigh)
+                        {
+                            rangeHigh = todayGlobexHigh;
+                        }
+                        else
+                        {
+                            rangeHigh = todayIBHigh;
+                        }
+
+                        
+                    if (todayGlobexLow < todayIBLow && noPositions())
+                    {
+                        rangeLow = todayGlobexLow;
+                    }
+                    else
+                    {
+                        rangeLow = todayIBLow;
+                    }
+                        UpdateRangeHigh();
+
                     }
                     else
                     {
 
 
                         Trail();
-                                                if (status == "Trail2" && !noPositions() && previousCandleRed() && Aroon(10).Up[0] > 70 && Aroon(10).Down[0] < 35 &&  !_isLongMainStopped && useAddon)// && StochRSI(14)[0]<=0.2)
+            if (status == "Trail2" && !noPositions() && previousCandleRed() && Aroon(10).Up[0] > 70 && Aroon(10).Down[0] < 35 &&  !_isLongMainStopped && useAddon)// && StochRSI(14)[0]<=0.2)
                         {
                             EnterLong(1, "addon");
                         }
@@ -302,7 +314,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         string rando = Convert.ToString(_nr);
                         string name = "tag " + rando;
                         _breakoutValid = true;
-                        Draw.ArrowDown(this, name, true, 0, High[0] + 4 * TickSize, Brushes.Red);
+                //      Draw.ArrowDown(this, name, true, 0, High[0] + 4 * TickSize, Brushes.Red);
                 //        EnterShort("Just short",1);
                     }
                     
