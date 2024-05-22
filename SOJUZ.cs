@@ -44,6 +44,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         int _rthStartTime;
         int _rthEndTime;
         int _IbEndTime;
+        private Indicator _ema;
+        private double _emaValue;
         double rangeHigh;
         double rangeLow;
         public int _StopLevel; //from globex
@@ -273,7 +275,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         UpdateLotSizeBasedOnProfit();
                     };
                     //check if breakout was valid
-                    if (Closes[0][0] >= rangeHigh + (TickSize * breakoutTreshold) && !_breakoutValid && noPositions()  && retestCount < numberOfRetests &&  rangeHigh-todayGlobexHigh < 25  && Aroon(10).Up[0] > 70 && Aroon(10).Down[0] < 35)// && previousCandleRed())
+                    if (Closes[0][0] >= rangeHigh + (TickSize * breakoutTreshold) && !_breakoutValid && noPositions()  && retestCount < numberOfRetests &&  rangeHigh-todayGlobexHigh < 25  && Aroon(10).Up[0] > 70 && Aroon(10).Down[0] < 35)// && Closes[0][0] > _emaValue)// && previousCandleRed())
                     {
                         int posSize = 0;
                         double stopSize = CalculateStopLoss();
@@ -334,6 +336,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 else if (BarsInProgress == 2) // 4 min
                 {
                     atrDayValue = _atrDay[0];
+                    _emaValue = _ema[0];
                 }
             }
 
@@ -522,6 +525,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             _atr = ATR(BarsArray[1], AtrPeriod);
             _atrDay = ATR(BarsArray[2], 14);
+            _ema = EMA(BarsArray[2], 14);
             _kama = KAMA(BarsArray[0], 10,14,30);
             _rvol = ReVOLT(BarsArray[0], 10, 1.3, 0.8);
             AddChartIndicator(_rvol);

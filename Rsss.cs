@@ -133,7 +133,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 if (BarsInProgress == 0 && _canTrade)
                 {
-                    if (Closes[0][0] > todayIBHigh  && RSI(9,1)[0] > 70  && previousCandleRed() && Aroon(BarsArray[0], 10).Up[0] > 70 && noPositions())
+                    if (Closes[0][0] > todayIBHigh  && RSI(9,1)[0] > 30  && previousCandleRed() && Aroon(BarsArray[0], 10).Up[0] > 70 && noPositions())
                     {
                         int posSize = 0;
                         if (Closes[0][0] - stopLevelLow < atrValue)
@@ -159,10 +159,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                     }
                     }
 
-                    if (Closes[0][0] < todayIBLow && RSI(9,1)[0] < 30 && previousCandleGreen() && Aroon(BarsArray[0], 10).Down[0] > 70 && noPositions())
+                    if (Closes[0][0] < todayIBLow && RSI(9,1)[0] < 70 && previousCandleGreen() && Aroon(BarsArray[0], 10).Down[0] > 70 && noPositions())
                     {
-                        EnterShort(3, "Short Main");
-                        EnterShort(1, "Short Runner");
+          //              EnterShort(3, "Short Main");
+           //             EnterShort(1, "Short Runner");
                     //    breakoutLongValid = false;
                     //  retestCount++;
                 }
@@ -195,8 +195,8 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if(BarsInProgress == 1)
                 {
                     atrValue = ATR(14)[0];
-                    stopLevelHigh = Highs[1][1] + 1.5;
-                    stopLevelLow = Lows[1][1] -1.5;
+                    stopLevelHigh = Highs[1][0] + 1.5;
+                    stopLevelLow = Lows[1][0] -1.5;
                 }
                 if (BarsInProgress == 2)
                 {
@@ -234,17 +234,17 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (execution.Order.Name == "Long Main" && execution.Order.OrderState == OrderState.Filled && execution.Order.OrderAction == OrderAction.Buy)
             {
              //   double stopPrice = todayIBLow - ( TickSize *  StopLossTicks) ;
-                SetStopLoss("Long Main", CalculationMode.Price, stopLevelLow, false);
-                SetStopLoss("Long Runner", CalculationMode.Price, stopLevelLow, false);
-                SetProfitTarget("Long Main", CalculationMode.Price, price +  2 * atrValue );
-                SetProfitTarget("Long Runner", CalculationMode.Price, price + 4 * atrValue);
+                SetStopLoss("Long Main", CalculationMode.Ticks, StopLossTicks, false);
+                SetStopLoss("Long Runner", CalculationMode.Ticks, StopLossTicks, false);
+                SetProfitTarget("Long Main", CalculationMode.Ticks, price +  2 * atrValue );
+                SetProfitTarget("Long Runner", CalculationMode.Ticks, price + 4 * atrValue);
             }
 
             if (execution.Order.Name == "Short Main" && execution.Order.OrderState == OrderState.Filled && execution.Order.OrderAction == OrderAction.SellShort)
             {
             //    double stopPrice = todayIBHigh + (atrValue/StopLossTicks);
-                SetStopLoss("Short Main", CalculationMode.Price, stopLevelHigh, false);
-                SetStopLoss("Short Runner", CalculationMode.Price, stopLevelHigh, false);
+                SetStopLoss("Short Main", CalculationMode.Ticks, StopLossTicks, false);
+                SetStopLoss("Short Runner", CalculationMode.Ticks, StopLossTicks, false);
                 SetProfitTarget("Short Main", CalculationMode.Price, price - 2 * atrValue);
                 SetProfitTarget("Short Runner", CalculationMode.Price, price - 4 * atrValue);
             }
