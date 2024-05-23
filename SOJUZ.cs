@@ -73,8 +73,11 @@ namespace NinjaTrader.NinjaScript.Strategies
         private double rvolTreshold;
         private int _amountForSizeUp;
          private double previousRangeHigh = 0.0;
-
+        private double thisWeekHigh;
         private Account account;
+        private int _stopAddOnScaling;
+        private int UserMaxStop;
+        private int S;
         #endregion
 
         #region My Parameters
@@ -162,6 +165,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 addonOrders = new List<Order>();
                 AddDataSeries(BarsPeriodType.Minute, 15);
                 AddDataSeries(BarsPeriodType.Day, 1);
+                AddDataSeries(BarsPeriodType.Week, 1);
             }
             else if (State == State.DataLoaded)
             {
@@ -191,6 +195,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 retestCount = 0;
                 lastResetTime = Time[0];
+                thisWeekHigh = Levels4().GetThisWeekHigh();
             }
 
             CalculateTradeTime();
@@ -221,9 +226,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                     todayGlobexLow = Levels4().GetTodayGlobexLow();
                     todayIBHigh = Levels4().GetTodayIBHigh(); // Correctly call the method
                     todayIBLow = Levels4().GetTodayIBLow();
+             
 
 
-            
+
 
                     if (todayGlobexLow < todayIBLow && noPositions())
                     {
@@ -264,9 +270,19 @@ namespace NinjaTrader.NinjaScript.Strategies
 
 
                         Trail();
-            if (status == "Trail2" && !noPositions() && previousCandleRed() && Aroon(10).Up[0] > 70 && Aroon(10).Down[0] < 35 &&  !_isLongMainStopped && useAddon)// && StochRSI(14)[0]<=0.2)
+                        if (status == "Trail2" && !noPositions() && previousCandleRed() && Aroon(10).Up[0] > 70 && Aroon(10).Down[0] < 35 &&  !_isLongMainStopped && useAddon)// && StochRSI(14)[0]<=0.2)
                         {
-                            EnterLong(1, "addon");
+
+                    //        if (Closes[0][0]> thisWeekHigh)
+                          {
+                                EnterLong(5, "addon");
+                        }
+                            /*
+                            else
+                            {
+                                EnterLong(5, "addon");
+                            }*/
+               
                         }
                         AdjustStop();
                     };
@@ -284,10 +300,12 @@ namespace NinjaTrader.NinjaScript.Strategies
                         if (rangeHigh - todayGlobexHigh <= atrValue)
                         {
                             posSize = (int)(LotSize1 * 1.5);
+         
                         }
                        else if (rangeHigh - todayGlobexHigh <= atrValue * 2)
                         {
                             posSize = LotSize1;
+         
                         }
                         else if (rangeHigh - todayGlobexHigh <= atrValue * 3)
                         {
@@ -297,6 +315,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                         {
                             posSize = (LotSize1 / 3);
                         }
+                 
                         posSize = posSize > MaxLotSize ? MaxLotSize : posSize;
                       if (posSize * stopSize * 5 < MaxStop)
                         {
@@ -490,8 +509,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
                 if (execution.Order.Name == "addon")
                 {
-
                     addonOrders.Add(execution.Order); // Add addon orders to the list
+                    SetProfitTarget(execution.Order.Name, CalculationMode.Price, price + atrValue);
                 }
             }
             if (execution.Order.Name == "Long Main" && execution.Order.OrderState == OrderState.Filled && execution.Order.OrderAction ==OrderAction.Sell)
@@ -570,12 +589,6 @@ namespace NinjaTrader.NinjaScript.Strategies
             set { _breakoutTreshold = value; }
         }
 
-        [Display(Name = "Test Treshold (ticks)", GroupName = "Test Parameters", Order = 1)]
-        public int testTreshold
-        {
-            get { return _testTreshold; }
-            set { _testTreshold = value; }
-        }
 
 
         #endregion
@@ -611,7 +624,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             get { return _amountForSizeUp; }
             set { _amountForSizeUp = value; }
         }
-        [Display(Name = "Max PositionSize", GroupName = "Filters", Order = 0)]
+        [Display(Name = "Max PositionSize", GroupName = "Position Management", Order = 0)]
         public int MaxLotSize
         {
             get { return _maxLotSize; }
@@ -654,11 +667,18 @@ namespace NinjaTrader.NinjaScript.Strategies
             set { _atrPeriod = value; }
         }
 
-        [Display(Name = "Max Stop Loss ($)", GroupName = "Filters", Order = 0)]
+        [Display(Name = "Max Stop Loss ($)", GroupName = "Position Management", Order = 0)]
         public int MaxStop
         {
             get { return _maxStop; }
             set { _maxStop = value; }
+        }
+
+        [Display(Name = "Stop size added on scaling ($)", GroupName = "Position Management", Order = 4)]
+        public int StopAddOnScaling
+        {
+            get { return _stopAddOnScaling; }
+            set { _stopAddOnScaling = value; }
         }
 
 
