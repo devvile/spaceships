@@ -76,8 +76,8 @@ namespace NinjaTrader.NinjaScript.Strategies
         private double thisWeekHigh;
         private Account account;
         private int _stopAddOnScaling;
-        private int UserMaxStop;
-        private int S;
+        private int _userMaxStop;
+        private int MaxStop;
         #endregion
 
         #region My Parameters
@@ -183,7 +183,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (CurrentBars[0] < BarsRequiredToTrade || CurrentBars[1] < BarsRequiredToTrade || CurrentBars[2] <= 14)
                 return;
 
-
+            MaxStop = UserMaxStop;
 
             int intDate = ToDay(Time[0]); // Get integer representation of the date
             bool isSpecialPeriod = DateRanges.Any(range => range.Contains(intDate));
@@ -203,6 +203,8 @@ namespace NinjaTrader.NinjaScript.Strategies
 
             if (ToTime(Time[0]) >= _rthEndTime && Position.MarketPosition == MarketPosition.Long)
             {
+                Print(ToTime(Time[0]));
+                    Print(_rthEndTime);
                 ExitLong("Exit Long After RTH", "addon");
                 ExitLong("Exit Long After RTH", "Long Main");
             };
@@ -289,6 +291,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     if (addSize)
                     {
                         UpdateLotSizeBasedOnProfit();
+                        UpdateMaxStopBasedOnProfit();
                     };
                     //check if breakout was valid
                     if (Closes[0][0] >= rangeHigh + (TickSize * breakoutTreshold) && !_breakoutValid && noPositions()  && retestCount < numberOfRetests &&  rangeHigh-todayGlobexHigh < 25  && Aroon(10).Up[0] > 70 && Aroon(10).Down[0] < 35)// && Closes[0][0] > _emaValue)// && previousCandleRed())
@@ -373,6 +376,23 @@ namespace NinjaTrader.NinjaScript.Strategies
                 rangeHigh = Highs[0][10];
             }
         }
+
+        private void UpdateMaxStopBasedOnProfit()
+        {
+            if (account == null)
+            {
+                //   Print("Account object is not initialized.");
+                return;
+            }
+
+            double accountProfit = SystemPerformance.AllTrades.TradesPerformance.Currency.CumProfit;
+            //     Print("Account Realized Profit/Loss: " + accountProfit);
+            int additionalMaxStopLots = (int)(accountProfit / AmountForSizeUp);
+            //          Print(accountProfit);
+            int addidtionalStopSize = additionalMaxStopLots * StopAddOnScaling;
+            MaxStop = UserMaxStop + addidtionalStopSize;
+        }
+
 
         private void UpdateLotSizeBasedOnProfit()
         { if (account == null)
@@ -526,7 +546,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (Close[0] - rangeHigh > (32 * TickSize))
             {
                 stopLoss = Close[0] - (rangeHigh - (atrValue / StopPosition));
-                Print(stopLoss);
+   
           //      stopLoss = StopPosition * TickSize;
             }
             else
@@ -668,10 +688,10 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
 
         [Display(Name = "Max Stop Loss ($)", GroupName = "Position Management", Order = 0)]
-        public int MaxStop
+        public int UserMaxStop
         {
-            get { return _maxStop; }
-            set { _maxStop = value; }
+            get { return _userMaxStop; }
+            set { _userMaxStop = value; }
         }
 
         [Display(Name = "Stop size added on scaling ($)", GroupName = "Position Management", Order = 4)]
