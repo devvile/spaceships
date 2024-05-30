@@ -180,7 +180,7 @@ namespace NinjaTrader.NinjaScript.Strategies
 
         protected override void OnBarUpdate()
         {
-            if (CurrentBars[0] < BarsRequiredToTrade || CurrentBars[1] < BarsRequiredToTrade || CurrentBars[2] <= 14)
+            if (CurrentBars[0] < BarsRequiredToTrade || CurrentBars[1] < BarsRequiredToTrade || CurrentBars[2] <= AtrPeriod || CurrentBars[3] < 2)
                 return;
 
             MaxStop = UserMaxStop;
@@ -245,6 +245,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                     if (noPositions())
                     {
                         SetStopLoss("Long Main", CalculationMode.Ticks, 40, false);
+                        SetProfitTarget("Long Main", CalculationMode.Ticks, 80);
                         status = "Flat";
                         if (todayGlobexHigh > todayIBHigh)
                         {
@@ -563,7 +564,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         private void AddIndicators()
         {
             _atr = ATR(BarsArray[1], AtrPeriod);
-            _atrDay = ATR(BarsArray[2], 14);
+            _atrDay = ATR(BarsArray[2], AtrPeriod); 
             _ema = EMA(BarsArray[2], 14);
             _kama = KAMA(BarsArray[0], 10,14,30);
             _rvol = ReVOLT(BarsArray[0], 10, 1.3, 0.8);
